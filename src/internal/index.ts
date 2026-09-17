@@ -33,6 +33,30 @@ export type DatabaseDiagramTable = {
     columns: DatabaseDiagramColumn[]
 }
 
+export type DatabaseColumnMetadata = {
+    column_name: string
+    data_type: string
+    udt_name: string
+    is_nullable: boolean
+    column_default: string | null
+    is_identity: boolean
+    is_generated: boolean
+    is_primary_key: boolean
+    is_application_generated: boolean
+    is_auto_generated: boolean
+    ordinal_position: number
+    enum_values: string[]
+}
+
+type DatabaseColumnMetadataRow = Omit<
+    DatabaseColumnMetadata,
+    'enum_values' | 'is_application_generated' | 'is_auto_generated'
+> & {
+    enum_values: unknown
+}
+
+export type InsertValue = string | number | boolean | null
+
 export type QueryValue =
     string | number | boolean | bigint | Date | null | QueryValue[] | { [key: string]: QueryValue }
 
@@ -92,6 +116,134 @@ export function getTableData(
         : ''
 
     return runQuery(`SELECT * FROM ${qualifiedTable}${orderBy} LIMIT ${options.limit}`)
+}
+
+export async function getTableMetadata(schema: string, table: string) {
+    const result = await db.execute<DatabaseColumnMetadataRow>(sql`
+        SELECT
+            table_column.column_name,
+            table_column.data_type,
+            table_column.udt_name,
+            table_column.is_nullable = 'YES' AS is_nullable,
+            table_column.column_default,
+            table_column.is_identity = 'YES' AS is_identity,
+            table_column.is_generated <> 'NEVER' AS is_generated,
+            EXISTS (
+                SELECT 1
+                FROM information_schema.table_constraints AS table_constraint
+                INNER JOIN information_schema.key_column_usage AS key_column
+                    ON key_column.constraint_catalog = table_constraint.constraint_catalog
+                    AND key_column.constraint_schema = table_constraint.constraint_schema
+                    AND key_column.constraint_name = table_constraint.constraint_name
+                WHERE table_constraint.constraint_type = 'PRIMARY KEY'
+                  AND table_constraint.table_schema = table_column.table_schema
+                  AND table_constraint.table_name = table_column.table_name
+                  AND key_column.column_name = table_column.column_name
+            ) AS is_primary_key,
+            table_column.ordinal_position,
+            COALESCE(
+                jsonb_agg(enum_value.enumlabel ORDER BY enum_value.enumsortorder)
+                    FILTER (WHERE enum_value.enumlabel IS NOT NULL),
+                '[]'::jsonb
+            ) AS enum_values
+        FROM information_schema.columns AS table_column
+        LEFT JOIN pg_namespace AS type_namespace
+            ON type_namespace.nspname = table_column.udt_schema
+        LEFT JOIN pg_type AS column_type
+            ON column_type.typnamespace = type_namespace.oid
+            AND column_type.typname = table_column.udt_name
+        LEFT JOIN pg_enum AS enum_value
+            ON enum_value.enumtypid = column_type.oid
+        WHERE table_column.table_schema = ${schema}
+          AND table_column.table_name = ${table}
+        GROUP BY
+            table_column.column_name,
+            table_column.table_schema,
+            table_column.table_name,
+            table_column.data_type,
+            table_column.udt_name,
+            table_column.is_nullable,
+            table_column.column_default,
+            table_column.is_identity,
+            table_column.is_generated,
+            table_column.ordinal_position
+        ORDER BY table_column.ordinal_position
+    `)
+
+    return result.rows.map((column) => {
+        const isApplicationGenerated =
+            column.is_primary_key &&
+            !column.is_identity &&
+            !column.is_generated &&
+            column.column_default === null &&
+            ['uuid', 'text', 'character varying', 'character'].includes(column.data_type)
+
+        return {
+            ...column,
+            enum_values: normalizeEnumValues(column.enum_values),
+            is_application_generated: isApplicationGenerated,
+            is_auto_generated:
+                column.is_identity ||
+                column.is_generated ||
+                column.column_default !== null ||
+                isApplicationGenerated,
+        }
+    })
+}
+
+function normalizeEnumValues(value: unknown): string[] {
+    if (Array.isArray(value))
+        return value.filter((item): item is string => typeof item === 'string')
+    if (typeof value !== 'string') return []
+
+    try {
+        const parsed: unknown = JSON.parse(value)
+        return Array.isArray(parsed)
+            ? parsed.filter((item): item is string => typeof item === 'string')
+            : []
+    } catch {
+        return []
+    }
+}
+
+export async function insertTableRow(
+    schema: string,
+    table: string,
+    values: Record<string, InsertValue>,
+) {
+    const metadata = await getTableMetadata(schema, table)
+    const writableColumns = new Set(
+        metadata.filter((column) => !column.is_auto_generated).map((column) => column.column_name),
+    )
+    const insertValues: Record<string, InsertValue> = Object.fromEntries(
+        Object.entries(values).filter(([column]) => writableColumns.has(column)),
+    )
+    for (const column of metadata) {
+        if (column.is_application_generated) {
+            insertValues[column.column_name] = crypto.randomUUID()
+        }
+    }
+    const entries = Object.entries(insertValues)
+    const qualifiedTable = sql`${sql.identifier(schema)}.${sql.identifier(table)}`
+
+    if (entries.length === 0) {
+        const result = await db.execute(sql`INSERT INTO ${qualifiedTable} DEFAULT VALUES`)
+        return { rowCount: result.rowCount ?? 0 }
+    }
+
+    const columns = sql.join(
+        entries.map(([column]) => sql.identifier(column)),
+        sql`, `,
+    )
+    const parameters = sql.join(
+        entries.map(([, value]) => sql`${value}`),
+        sql`, `,
+    )
+    const result = await db.execute(
+        sql`INSERT INTO ${qualifiedTable} (${columns}) VALUES (${parameters})`,
+    )
+
+    return { rowCount: result.rowCount ?? 0 }
 }
 
 export async function getDBRelationships(schema: string) {

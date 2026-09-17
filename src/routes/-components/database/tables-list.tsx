@@ -46,7 +46,7 @@ export function TablesList() {
             )}
 
             {tablesQuery.isSuccess && tablesQuery.data.length > 0 && (
-                <ul className="divide-y rounded-md border">
+                <ul>
                     {tablesQuery.data.map(({ table_name }) => (
                         <li key={table_name}>
                             <button

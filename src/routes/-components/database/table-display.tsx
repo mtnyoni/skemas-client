@@ -1,7 +1,10 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useQuery } from '@tanstack/react-query'
+import { PlusIcon } from '@heroicons/react/24/outline'
+import { useRef, useState } from 'react'
 
+import { Button } from '#/components/ui/button'
 import {
     Select,
     SelectContent,
@@ -11,7 +14,13 @@ import {
 } from '#/components/ui/select'
 import { loadTableData } from '#/internal/functions'
 
+import { EditableRow } from './editable-row'
+
+import type { EditableRowHandle } from './editable-row'
+
 export function TableDisplay() {
+    const [addingRow, setAddingRow] = useState(false)
+    const editableRowRef = useRef<EditableRowHandle>(null)
     const {
         schema: selectedSchema,
         table: selectedTable,
@@ -73,7 +82,7 @@ export function TableDisplay() {
 
     return (
         <div className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex px-3 mt-3 flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 className="font-medium">{selectedTable}</h2>
                     <p className="text-sm text-muted-foreground">
@@ -83,6 +92,26 @@ export function TableDisplay() {
                 </div>
 
                 <div className="flex flex-wrap items-end gap-2">
+                    {addingRow ? (
+                        <>
+                            <Button type="button" onClick={() => editableRowRef.current?.save()}>
+                                Save row
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setAddingRow(false)}
+                            >
+                                Cancel
+                            </Button>
+                        </>
+                    ) : (
+                        <Button type="button" onClick={() => setAddingRow(true)}>
+                            <PlusIcon data-icon="inline-start" />
+                            Add row
+                        </Button>
+                    )}
+
                     <div className="space-y-1">
                         <label className="block text-xs text-muted-foreground">Rows</label>
                         <Select value={String(limit)} onValueChange={setLimit}>
@@ -131,7 +160,7 @@ export function TableDisplay() {
                 </div>
             </div>
 
-            <div className="scrollbar-thin overflow-auto rounded-md border">
+            <div className="scrollbar-thin overflow-auto border-y">
                 <table className="w-full border-collapse text-sm">
                     <thead className="bg-muted">
                         <tr>
@@ -149,6 +178,16 @@ export function TableDisplay() {
                         </tr>
                     </thead>
                     <tbody className="divide-y">
+                        {addingRow && (
+                            <EditableRow
+                                key={`${selectedSchema}.${selectedTable}`}
+                                ref={editableRowRef}
+                                schema={selectedSchema!}
+                                table={selectedTable}
+                                columns={tableDataQuery.data.columns.map((column) => column.name)}
+                                onSaved={() => setAddingRow(false)}
+                            />
+                        )}
                         {tableDataQuery.data.rows.map((row, rowIndex) => (
                             <tr key={rowIndex}>
                                 {tableDataQuery.data.columns.map((column) => (

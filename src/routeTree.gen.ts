@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DiagramsRouteImport } from './routes/diagrams'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as QueriesRouteImport } from './routes/queries'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QueriesRoute = QueriesRouteImport.update({
+  id: '/queries',
+  path: '/queries',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/diagrams': typeof DiagramsRoute
   '/login': typeof LoginRoute
+  '/queries': typeof QueriesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/diagrams': typeof DiagramsRoute
   '/login': typeof LoginRoute
+  '/queries': typeof QueriesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/diagrams': typeof DiagramsRoute
   '/login': typeof LoginRoute
+  '/queries': typeof QueriesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/diagrams' | '/login'
+  fullPaths: '/' | '/diagrams' | '/login' | '/queries'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/diagrams' | '/login'
-  id: '__root__' | '/' | '/diagrams' | '/login'
+  to: '/' | '/diagrams' | '/login' | '/queries'
+  id: '__root__' | '/' | '/diagrams' | '/login' | '/queries'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiagramsRoute: typeof DiagramsRoute
   LoginRoute: typeof LoginRoute
+  QueriesRoute: typeof QueriesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/queries': {
+      id: '/queries'
+      path: '/queries'
+      fullPath: '/queries'
+      preLoaderRoute: typeof QueriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiagramsRoute: DiagramsRoute,
   LoginRoute: LoginRoute,
+  QueriesRoute: QueriesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

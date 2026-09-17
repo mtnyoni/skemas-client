@@ -50,3 +50,28 @@ export const loadDBRelationships = createServerFn({ method: 'GET' })
 
         return getDBRelationships(data.schema)
     })
+
+const tableTargetSchema = z.object({
+    schema: z.string().min(1),
+    table: z.string().min(1),
+})
+
+export const loadTableMetadata = createServerFn({ method: 'GET' })
+    .validator(tableTargetSchema)
+    .handler(async ({ data }) => {
+        const { getTableMetadata } = await import('./index')
+
+        return getTableMetadata(data.schema, data.table)
+    })
+
+export const createTableRow = createServerFn({ method: 'POST' })
+    .validator(
+        tableTargetSchema.extend({
+            values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+        }),
+    )
+    .handler(async ({ data }) => {
+        const { insertTableRow } = await import('./index')
+
+        return insertTableRow(data.schema, data.table, data.values)
+    })

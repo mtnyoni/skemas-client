@@ -1,4 +1,5 @@
 import { HeadContent, Link, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
+import type { LinkProps } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
@@ -44,38 +45,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 <HeadContent />
             </head>
             <body>
-                <main className="flex min-h-screen">
-                    <aside className="w-20 shrink-0 border-r p-3">
-                        <nav aria-label="Database tools" className="space-y-1">
-                            <Link to="/">
-                                <button
-                                    type="button"
-                                    aria-current="page"
-                                    className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm"
-                                >
-                                    <TableCellsIcon className="size-4" aria-hidden="true" />
-                                    Tables
-                                </button>
-                            </Link>
-                            <Link to="/diagrams">
-                                <button
-                                    type="button"
-                                    className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                                >
-                                    <ShareIcon className="size-4" aria-hidden="true" />
-                                    Diagrams
-                                </button>
-                            </Link>
-                            <button
-                                type="button"
-                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                            >
-                                <CodeBracketIcon className="size-4" aria-hidden="true" />
-                                Queries
-                            </button>
-                        </nav>
-                    </aside>
-                    <section className="min-w-0 flex-1">{children}</section>
+                <main className="flex overflow-hidden h-screen bg-mist-100">
+                    <Sidebar />
+                    <section className="min-w-0 rounded-l-lg my-auto h-[calc(100dvh-1rem)] flex-1 bg-white">
+                        {children}
+                    </section>
                 </main>
                 <TanStackDevtools
                     config={{
@@ -92,5 +66,48 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 <Scripts />
             </body>
         </html>
+    )
+}
+
+function Sidebar() {
+    return (
+        <aside className="w-20 shrink-0 p-3">
+            <nav aria-label="Database tools" className="space-y-1">
+                <SidebarItem to="/" label="Tables" exact />
+                <SidebarItem to="/diagrams" label="Diagrams" />
+                <SidebarItem to="/queries" label="Queries" />
+            </nav>
+        </aside>
+    )
+}
+
+const sidebarIcons = {
+    Tables: TableCellsIcon,
+    Diagrams: ShareIcon,
+    Queries: CodeBracketIcon,
+} as const
+
+type SidebarItemProps = {
+    to: LinkProps['to']
+    label: keyof typeof sidebarIcons
+    exact?: boolean
+}
+
+function SidebarItem({ to, label, exact = false }: SidebarItemProps) {
+    const Icon = sidebarIcons[label]
+
+    return (
+        <Link
+            to={to}
+            activeOptions={{ exact }}
+            className="flex w-full flex-col items-center gap-2 rounded-md px-2 py-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            activeProps={{ className: 'bg-accent text-foreground' }}
+            inactiveProps={{
+                className: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+            }}
+        >
+            <Icon className="size-4" aria-hidden="true" />
+            {label}
+        </Link>
     )
 }
