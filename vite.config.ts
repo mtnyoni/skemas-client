@@ -12,7 +12,6 @@ const config = defineConfig({
     resolve: { tsconfigPaths: true },
     build: {
         rolldownOptions: {
-            external: ['bun'],
             checks: {
                 moduleLevelDirective: false,
             },
@@ -22,7 +21,7 @@ const config = defineConfig({
         devtools(),
         nitro({
             minify: true,
-            rollupConfig: { external: ['bun', /^@sentry\//] },
+            rollupConfig: { external: [/^@sentry\//] },
         }),
         tailwindcss(),
         tanstackStart(),

@@ -4,7 +4,7 @@ import { z } from 'zod'
 export const loadSchemas = createServerFn({ method: 'GET' }).handler(async () => {
     const { getSchemas } = await import('./index')
 
-    return getSchemas()
+    return runDatabaseOperation('load schemas', getSchemas)
 })
 
 export const loadTables = createServerFn({ method: 'GET' })
@@ -16,7 +16,7 @@ export const loadTables = createServerFn({ method: 'GET' })
     .handler(async ({ data }) => {
         const { getTables } = await import('./index')
 
-        return getTables(data.schema)
+        return runDatabaseOperation('load tables', () => getTables(data.schema))
     })
 
 export const loadTableData = createServerFn({ method: 'GET' })
@@ -32,11 +32,13 @@ export const loadTableData = createServerFn({ method: 'GET' })
     .handler(async ({ data }) => {
         const { getTableData } = await import('./index')
 
-        return getTableData(data.schema, data.table, {
-            limit: data.limit,
-            sort: data.sort,
-            order: data.order,
-        })
+        return runDatabaseOperation('load table data', () =>
+            getTableData(data.schema, data.table, {
+                limit: data.limit,
+                sort: data.sort,
+                order: data.order,
+            }),
+        )
     })
 
 export const loadDBRelationships = createServerFn({ method: 'GET' })
@@ -48,7 +50,9 @@ export const loadDBRelationships = createServerFn({ method: 'GET' })
     .handler(async ({ data }) => {
         const { getDBRelationships } = await import('./index')
 
-        return getDBRelationships(data.schema)
+        return runDatabaseOperation('load database relationships', () =>
+            getDBRelationships(data.schema),
+        )
     })
 
 const tableTargetSchema = z.object({
@@ -61,7 +65,9 @@ export const loadTableMetadata = createServerFn({ method: 'GET' })
     .handler(async ({ data }) => {
         const { getTableMetadata } = await import('./index')
 
-        return getTableMetadata(data.schema, data.table)
+        return runDatabaseOperation('load table metadata', () =>
+            getTableMetadata(data.schema, data.table),
+        )
     })
 
 export const createTableRow = createServerFn({ method: 'POST' })
@@ -73,5 +79,27 @@ export const createTableRow = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const { insertTableRow } = await import('./index')
 
-        return insertTableRow(data.schema, data.table, data.values)
+        return runDatabaseOperation('create table row', () =>
+            insertTableRow(data.schema, data.table, data.values),
+        )
     })
+
+async function runDatabaseOperation<T>(operation: string, run: () => Promise<T>): Promise<T> {
+    try {
+        return await run()
+    } catch (error) {
+        const details = error instanceof Error ? error : new Error(String(error))
+        const code = 'code' in details ? String(details.code) : undefined
+
+        console.error('[database] Operation failed', {
+            operation,
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            database: process.env.DB_NAME,
+            user: process.env.DB_USER,
+            message: details.message,
+            code,
+        })
+        throw error
+    }
+}

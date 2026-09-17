@@ -1,7 +1,8 @@
-import { SQL } from 'bun'
+import '@tanstack/react-start/server-only'
+import postgres from 'postgres'
 
-export const sql = new SQL({
-    hostname: requiredEnv('DB_HOST'),
+export const sql = postgres({
+    host: requiredEnv('DB_HOST'),
     port: databasePort(),
     username: requiredEnv('DB_USER'),
     password: requiredEnv('DB_PASSWORD'),
