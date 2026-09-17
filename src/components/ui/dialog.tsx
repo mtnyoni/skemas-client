@@ -1,10 +1,9 @@
 import * as React from 'react'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
+import { XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from 'cn'
 
 import { Button } from '#/components/ui/button.tsx'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Cancel01Icon } from '@hugeicons/core-free-icons'
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
     return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -66,7 +65,7 @@ function DialogContent({
                             />
                         }
                     >
-                        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+                        <XMarkIcon />
                         <span className="sr-only">Close</span>
                     </DialogPrimitive.Close>
                 )}

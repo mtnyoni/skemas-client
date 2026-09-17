@@ -1,14 +1,13 @@
 import { useTheme } from 'next-themes'
 import { Toaster as Sonner } from 'sonner'
 import type { ToasterProps } from 'sonner'
-import { HugeiconsIcon } from '@hugeicons/react'
 import {
-    CheckmarkCircle02Icon,
+    ArrowPathIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
     InformationCircleIcon,
-    Alert02Icon,
-    MultiplicationSignCircleIcon,
-    Loading03Icon,
-} from '@hugeicons/core-free-icons'
+    XCircleIcon,
+} from '@heroicons/react/24/outline'
 
 const Toaster = ({ ...props }: ToasterProps) => {
     const { theme = 'system' } = useTheme()
@@ -18,35 +17,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
             theme={theme as ToasterProps['theme']}
             className="toaster group"
             icons={{
-                success: (
-                    <HugeiconsIcon
-                        icon={CheckmarkCircle02Icon}
-                        strokeWidth={2}
-                        className="size-4"
-                    />
-                ),
-                info: (
-                    <HugeiconsIcon
-                        icon={InformationCircleIcon}
-                        strokeWidth={2}
-                        className="size-4"
-                    />
-                ),
-                warning: <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-4" />,
-                error: (
-                    <HugeiconsIcon
-                        icon={MultiplicationSignCircleIcon}
-                        strokeWidth={2}
-                        className="size-4"
-                    />
-                ),
-                loading: (
-                    <HugeiconsIcon
-                        icon={Loading03Icon}
-                        strokeWidth={2}
-                        className="size-4 animate-spin"
-                    />
-                ),
+                success: <CheckCircleIcon className="size-4" />,
+                info: <InformationCircleIcon className="size-4" />,
+                warning: <ExclamationTriangleIcon className="size-4" />,
+                error: <XCircleIcon className="size-4" />,
+                loading: <ArrowPathIcon className="size-4 animate-spin" />,
             }}
             style={
                 {
