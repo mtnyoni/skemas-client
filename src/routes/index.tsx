@@ -10,8 +10,25 @@ const searchSchema = z
     .object({
         schema: z.string().min(1).optional().catch(undefined),
         table: z.string().min(1).optional().catch(undefined),
+        limit: z.coerce.number().int().positive().optional().catch(undefined),
+        sort: z.string().min(1).optional().catch(undefined),
+        order: z.enum(['asc', 'desc']).optional().catch(undefined),
     })
-    .transform((search) => (search.schema ? search : { schema: undefined, table: undefined }))
+    .transform((search) => {
+        if (!search.schema) {
+            return {
+                schema: undefined,
+                table: undefined,
+                limit: search.limit,
+                sort: undefined,
+                order: undefined,
+            }
+        }
+
+        if (!search.table) return { ...search, sort: undefined, order: undefined }
+
+        return search
+    })
 
 export const Route = createFileRoute('/')({
     validateSearch: searchSchema,

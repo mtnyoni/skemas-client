@@ -16,7 +16,12 @@ export function TablesList() {
 
     function selectTable(table: string) {
         void navigate({
-            search: (previous) => ({ ...previous, table }),
+            search: (previous) => ({
+                ...previous,
+                table,
+                sort: undefined,
+                order: undefined,
+            }),
         })
     }
 

@@ -24,10 +24,17 @@ export const loadTableData = createServerFn({ method: 'GET' })
         z.object({
             schema: z.string().min(1),
             table: z.string().min(1),
+            limit: z.number().int().positive(),
+            sort: z.string().min(1).optional(),
+            order: z.enum(['asc', 'desc']),
         }),
     )
     .handler(async ({ data }) => {
         const { getTableData } = await import('./index')
 
-        return getTableData(data.schema, data.table)
+        return getTableData(data.schema, data.table, {
+            limit: data.limit,
+            sort: data.sort,
+            order: data.order,
+        })
     })

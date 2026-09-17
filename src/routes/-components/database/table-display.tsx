@@ -1,20 +1,63 @@
-import { useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useQuery } from '@tanstack/react-query'
 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '#/components/ui/select'
 import { loadTableData } from '#/internal/functions'
 
 export function TableDisplay() {
-    const { schema: selectedSchema, table: selectedTable } = useSearch({ from: '/' })
+    const {
+        schema: selectedSchema,
+        table: selectedTable,
+        limit: searchLimit,
+        sort: sortColumn,
+        order: searchOrder,
+    } = useSearch({ from: '/' })
+    const navigate = useNavigate({ from: '/' })
+    const limit = searchLimit ?? 100
+    const sortOrder = searchOrder ?? 'asc'
     const getTableData = useServerFn(loadTableData)
     const tableDataQuery = useQuery({
-        queryKey: ['table-data', selectedSchema, selectedTable],
+        queryKey: ['table-data', selectedSchema, selectedTable, limit, sortColumn, sortOrder],
         queryFn: () =>
             getTableData({
-                data: { schema: selectedSchema!, table: selectedTable! },
+                data: {
+                    schema: selectedSchema!,
+                    table: selectedTable!,
+                    limit,
+                    sort: sortColumn,
+                    order: sortOrder,
+                },
             }),
         enabled: selectedSchema !== undefined && selectedTable !== undefined,
+        placeholderData: (previousData) => previousData,
     })
+
+    function setLimit(value: string | null) {
+        if (!value) return
+        void navigate({ search: (previous) => ({ ...previous, limit: Number(value) }) })
+    }
+
+    function setSort(value: string | null) {
+        void navigate({
+            search: (previous) => ({
+                ...previous,
+                sort: value === 'none' || value === null ? undefined : value,
+                order: value === 'none' || value === null ? undefined : previous.order,
+            }),
+        })
+    }
+
+    function setOrder(value: string | null) {
+        if (value !== 'asc' && value !== 'desc') return
+        void navigate({ search: (previous) => ({ ...previous, order: value }) })
+    }
 
     if (!selectedTable) {
         return <p className="text-sm text-muted-foreground">Select a table to view its data.</p>
@@ -30,9 +73,62 @@ export function TableDisplay() {
 
     return (
         <div className="space-y-3">
-            <div>
-                <h2 className="font-medium">{selectedTable}</h2>
-                <p className="text-sm text-muted-foreground">Showing up to 100 rows</p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 className="font-medium">{selectedTable}</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Showing up to {limit} rows
+                        {tableDataQuery.isFetching ? ' · Updating…' : ''}
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1">
+                        <label className="block text-xs text-muted-foreground">Rows</label>
+                        <Select value={String(limit)} onValueChange={setLimit}>
+                            <SelectTrigger className="w-20">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {[25, 50, 100, 250, 500, 1000].map((value) => (
+                                    <SelectItem key={value} value={String(value)}>
+                                        {value}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="block text-xs text-muted-foreground">Sort by</label>
+                        <Select value={sortColumn ?? 'none'} onValueChange={setSort}>
+                            <SelectTrigger className="w-44">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">No sorting</SelectItem>
+                                {tableDataQuery.data.columns.map((column) => (
+                                    <SelectItem key={column.name} value={column.name}>
+                                        {column.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="block text-xs text-muted-foreground">Order</label>
+                        <Select value={sortOrder} onValueChange={setOrder} disabled={!sortColumn}>
+                            <SelectTrigger className="w-28">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="asc">Ascending</SelectItem>
+                                <SelectItem value="desc">Descending</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
             </div>
 
             <div className="scrollbar-thin overflow-auto rounded-md border">

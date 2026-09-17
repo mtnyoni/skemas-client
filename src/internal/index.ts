@@ -57,8 +57,15 @@ function quoteIdentifier(identifier: string) {
     return `"${identifier.replaceAll('"', '""')}"`
 }
 
-export function getTableData(schema: string, table: string) {
+export function getTableData(
+    schema: string,
+    table: string,
+    options: { limit: number; sort?: string; order: 'asc' | 'desc' },
+) {
     const qualifiedTable = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
+    const orderBy = options.sort
+        ? ` ORDER BY ${quoteIdentifier(options.sort)} ${options.order.toUpperCase()}`
+        : ''
 
-    return runQuery(`SELECT * FROM ${qualifiedTable} LIMIT 100`)
+    return runQuery(`SELECT * FROM ${qualifiedTable}${orderBy} LIMIT ${options.limit}`)
 }
