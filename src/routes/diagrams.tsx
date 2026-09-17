@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 
 import {
@@ -117,6 +118,14 @@ type TablePosition = {
     height: number
 }
 
+type Point = { x: number; y: number }
+
+type DragState = {
+    tableName: string
+    pointerX: number
+    pointerY: number
+}
+
 function RelationshipDiagram({
     schema,
     tables,
@@ -126,83 +135,208 @@ function RelationshipDiagram({
     tables: DatabaseDiagramTable[]
     relationships: DatabaseRelationship[]
 }) {
+    const viewportRef = useRef<HTMLDivElement>(null)
+    const [zoom, setZoom] = useState(1)
+    const [offsets, setOffsets] = useState<Record<string, Point>>({})
+    const [dragging, setDragging] = useState<DragState | null>(null)
     const layout = createLayout(tables)
+    const displayedTables = layout.tables.map((position) => {
+        const offset = offsets[position.table.table_name] ?? { x: 0, y: 0 }
+        return { ...position, x: position.x + offset.x, y: position.y + offset.y }
+    })
     const positions = new Map(
-        layout.tables.map((position) => [position.table.table_name, position]),
+        displayedTables.map((position) => [position.table.table_name, position]),
     )
 
+    useEffect(() => {
+        const viewport = viewportRef.current
+        if (!viewport) return
+
+        function zoomWithWheel(event: WheelEvent) {
+            if (!event.ctrlKey && !event.metaKey) return
+            event.preventDefault()
+            setZoom((current) => clampZoom(current + (event.deltaY < 0 ? 0.1 : -0.1)))
+        }
+
+        viewport.addEventListener('wheel', zoomWithWheel, { passive: false })
+        return () => viewport.removeEventListener('wheel', zoomWithWheel)
+    }, [])
+
+    function startDragging(tableName: string, pointerX: number, pointerY: number) {
+        setDragging({ tableName, pointerX, pointerY })
+    }
+
+    function moveTable(pointerX: number, pointerY: number) {
+        if (!dragging) return
+
+        const basePosition = layout.tables.find(
+            (position) => position.table.table_name === dragging.tableName,
+        )
+        if (!basePosition) return
+
+        const currentOffset = offsets[dragging.tableName] ?? { x: 0, y: 0 }
+        const nextX = clamp(
+            basePosition.x + currentOffset.x + (pointerX - dragging.pointerX) / zoom,
+            12,
+            layout.width - CARD_WIDTH - 12,
+        )
+        const nextY = clamp(
+            basePosition.y + currentOffset.y + (pointerY - dragging.pointerY) / zoom,
+            12,
+            layout.height - basePosition.height - 12,
+        )
+
+        setOffsets((current) => ({
+            ...current,
+            [dragging.tableName]: {
+                x: nextX - basePosition.x,
+                y: nextY - basePosition.y,
+            },
+        }))
+        setDragging({ tableName: dragging.tableName, pointerX, pointerY })
+    }
+
     return (
-        <div className="scrollbar-thin h-[calc(100vh-9rem)] overflow-auto rounded-lg border bg-slate-50">
-            <svg
-                role="img"
-                aria-label={`Entity relationship diagram for the ${schema} schema`}
-                width={layout.width}
-                height={layout.height}
-                viewBox={`0 0 ${layout.width} ${layout.height}`}
-                className="block min-h-full min-w-full"
-            >
-                <defs>
-                    <pattern id="diagram-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                        <circle cx="1" cy="1" r="1" fill="#cbd5e1" opacity="0.55" />
-                    </pattern>
-                    <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="150%">
-                        <feDropShadow dx="0" dy="3" stdDeviation="5" floodOpacity="0.12" />
-                    </filter>
-                </defs>
+        <div className="relative h-[calc(100vh-9rem)] overflow-hidden rounded-lg border bg-slate-50">
+            <div className="pointer-events-none absolute top-3 left-3 z-10 rounded-md border bg-white/90 px-2 py-1 text-xs text-slate-500 shadow-sm">
+                Ctrl + scroll to zoom · Drag tables to move
+            </div>
 
-                <rect width="100%" height="100%" fill="#f8fafc" />
-                <rect width="100%" height="100%" fill="url(#diagram-grid)" />
+            <div className="absolute right-3 bottom-3 z-10 flex items-center overflow-hidden rounded-md border bg-white shadow-sm">
+                <button
+                    type="button"
+                    aria-label="Zoom out"
+                    className="grid size-8 place-items-center text-lg text-slate-700 hover:bg-slate-100"
+                    onClick={() => setZoom((current) => clampZoom(current - 0.1))}
+                >
+                    −
+                </button>
+                <span className="min-w-14 border-x px-2 text-center text-xs text-slate-600">
+                    {Math.round(zoom * 100)}%
+                </span>
+                <button
+                    type="button"
+                    aria-label="Zoom in"
+                    className="grid size-8 place-items-center text-lg text-slate-700 hover:bg-slate-100"
+                    onClick={() => setZoom((current) => clampZoom(current + 0.1))}
+                >
+                    +
+                </button>
+            </div>
 
-                <g aria-label="Relationships">
-                    {relationships.map((relationship) => {
-                        const source = positions.get(relationship.source_table)
-                        const target = positions.get(relationship.target_table)
-                        if (!source || !target || relationship.target_schema !== schema) return null
+            <div ref={viewportRef} className="scrollbar-thin h-full overflow-auto">
+                <svg
+                    role="img"
+                    aria-label={`Entity relationship diagram for the ${schema} schema`}
+                    width={layout.width * zoom}
+                    height={layout.height * zoom}
+                    viewBox={`0 0 ${layout.width} ${layout.height}`}
+                    className="block min-h-full min-w-full touch-none select-none"
+                    onPointerMove={(event) => moveTable(event.clientX, event.clientY)}
+                    onPointerUp={() => setDragging(null)}
+                    onPointerCancel={() => setDragging(null)}
+                >
+                    <defs>
+                        <pattern
+                            id="diagram-grid"
+                            width="24"
+                            height="24"
+                            patternUnits="userSpaceOnUse"
+                        >
+                            <circle cx="1" cy="1" r="1" fill="#cbd5e1" opacity="0.55" />
+                        </pattern>
+                        <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="150%">
+                            <feDropShadow dx="0" dy="3" stdDeviation="5" floodOpacity="0.12" />
+                        </filter>
+                    </defs>
 
-                        const path = createRelationshipPath(source, target, relationship)
+                    <rect width="100%" height="100%" fill="#f8fafc" />
+                    <rect width="100%" height="100%" fill="url(#diagram-grid)" />
 
-                        return (
-                            <g
-                                key={`${relationship.constraint_name}-${relationship.source_column}`}
-                            >
-                                <title>
-                                    {relationship.source_table}.{relationship.source_column} →{' '}
-                                    {relationship.target_table}.{relationship.target_column}
-                                </title>
-                                <path d={path.d} fill="none" stroke="#64748b" strokeWidth="1.75" />
-                                <circle cx={path.startX} cy={path.startY} r="4" fill="#64748b" />
-                                <circle
-                                    cx={path.endX}
-                                    cy={path.endY}
-                                    r="5"
-                                    fill="#fff"
-                                    stroke="#64748b"
-                                    strokeWidth="2"
-                                />
-                            </g>
-                        )
-                    })}
-                </g>
+                    <g aria-label="Relationships">
+                        {relationships.map((relationship) => {
+                            const source = positions.get(relationship.source_table)
+                            const target = positions.get(relationship.target_table)
+                            if (!source || !target || relationship.target_schema !== schema)
+                                return null
 
-                <g aria-label="Tables">
-                    {layout.tables.map((position, index) => (
-                        <TableCard
-                            key={position.table.table_name}
-                            position={position}
-                            accent={CARD_COLORS[index % CARD_COLORS.length]}
-                        />
-                    ))}
-                </g>
-            </svg>
+                            const path = createRelationshipPath(source, target, relationship)
+
+                            return (
+                                <g
+                                    key={`${relationship.constraint_name}-${relationship.source_column}`}
+                                >
+                                    <title>
+                                        {relationship.source_table}.{relationship.source_column} →{' '}
+                                        {relationship.target_table}.{relationship.target_column}
+                                    </title>
+                                    <path
+                                        d={path.d}
+                                        fill="none"
+                                        stroke="#64748b"
+                                        strokeWidth="1.75"
+                                    />
+                                    <circle
+                                        cx={path.startX}
+                                        cy={path.startY}
+                                        r="4"
+                                        fill="#64748b"
+                                    />
+                                    <circle
+                                        cx={path.endX}
+                                        cy={path.endY}
+                                        r="5"
+                                        fill="#fff"
+                                        stroke="#64748b"
+                                        strokeWidth="2"
+                                    />
+                                </g>
+                            )
+                        })}
+                    </g>
+
+                    <g aria-label="Tables">
+                        {displayedTables.map((position, index) => (
+                            <TableCard
+                                key={position.table.table_name}
+                                position={position}
+                                accent={CARD_COLORS[index % CARD_COLORS.length]}
+                                dragging={dragging?.tableName === position.table.table_name}
+                                onPointerDown={(pointerX, pointerY) =>
+                                    startDragging(position.table.table_name, pointerX, pointerY)
+                                }
+                            />
+                        ))}
+                    </g>
+                </svg>
+            </div>
         </div>
     )
 }
 
-function TableCard({ position, accent }: { position: TablePosition; accent: string }) {
+function TableCard({
+    position,
+    accent,
+    dragging,
+    onPointerDown,
+}: {
+    position: TablePosition
+    accent: string
+    dragging: boolean
+    onPointerDown: (pointerX: number, pointerY: number) => void
+}) {
     const { table, x, y, height } = position
 
     return (
-        <g transform={`translate(${x} ${y})`} filter="url(#card-shadow)">
+        <g
+            transform={`translate(${x} ${y})`}
+            filter="url(#card-shadow)"
+            className={dragging ? 'cursor-grabbing' : 'cursor-grab'}
+            onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId)
+                onPointerDown(event.clientX, event.clientY)
+            }}
+        >
             <rect width={CARD_WIDTH} height={height} rx="8" fill="#fff" stroke="#cbd5e1" />
             <path
                 d={`M 8 0 H ${CARD_WIDTH - 8} Q ${CARD_WIDTH} 0 ${CARD_WIDTH} 8 V ${HEADER_HEIGHT} H 0 V 8 Q 0 0 8 0`}
@@ -337,4 +471,12 @@ function createRelationshipPath(
 
 function truncate(value: string, length: number) {
     return value.length > length ? `${value.slice(0, length - 1)}…` : value
+}
+
+function clampZoom(zoom: number) {
+    return Math.round(clamp(zoom, 0.4, 2.5) * 10) / 10
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+    return Math.min(Math.max(value, minimum), maximum)
 }
