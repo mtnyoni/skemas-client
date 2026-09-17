@@ -7,6 +7,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
+import { CodeBracketIcon, ShareIcon, TableCellsIcon } from '@heroicons/react/24/outline'
 
 interface MyRouterContext {
     queryClient: QueryClient
@@ -43,7 +44,35 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 <HeadContent />
             </head>
             <body>
-                {children}
+                <main className="flex min-h-screen">
+                    <aside className="w-20 shrink-0 border-r p-3">
+                        <nav aria-label="Database tools" className="space-y-1">
+                            <button
+                                type="button"
+                                aria-current="page"
+                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm"
+                            >
+                                <TableCellsIcon className="size-4" aria-hidden="true" />
+                                Tables
+                            </button>
+                            <button
+                                type="button"
+                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                            >
+                                <ShareIcon className="size-4" aria-hidden="true" />
+                                Diagrams
+                            </button>
+                            <button
+                                type="button"
+                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                            >
+                                <CodeBracketIcon className="size-4" aria-hidden="true" />
+                                Queries
+                            </button>
+                        </nav>
+                    </aside>
+                    <section className="min-w-0 flex-1">{children}</section>
+                </main>
                 <TanStackDevtools
                     config={{
                         position: 'bottom-right',
