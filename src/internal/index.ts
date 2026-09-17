@@ -84,7 +84,7 @@ export async function runQuery<T extends Record<string, QueryValue>>(query: stri
     const rows = await sql.unsafe<T[]>(query)
 
     return {
-        columns: Object.keys(rows[0] ?? {}).map((name) => ({ name })),
+        columns: Object.keys(rows[0]).map((name) => ({ name })),
         rows,
     }
 }
@@ -97,6 +97,7 @@ export async function getTableData(
     const orderBy = options.sort
         ? sql`ORDER BY ${sql(options.sort)} ${options.order === 'asc' ? sql`ASC` : sql`DESC`}`
         : sql``
+
     const [rows, metadata] = await Promise.all([
         sql<Record<string, QueryValue>[]>`
             SELECT *

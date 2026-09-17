@@ -42,10 +42,10 @@ function DiagramsPage() {
 
     return (
         <div className="flex min-h-screen flex-col">
-            <header className="flex items-center justify-between gap-4 border-b px-6 py-4">
+            <header className="flex items-center justify-between gap-4 border-b px-3 h-16">
                 <div>
-                    <h1 className="font-semibold">Database diagram</h1>
-                    <p className="text-sm text-muted-foreground">
+                    <h1 className="font-medium text-sm">Database diagram</h1>
+                    <p className="text-xs text-muted-foreground">
                         Tables and foreign-key relationships
                     </p>
                 </div>
@@ -64,7 +64,7 @@ function DiagramsPage() {
                 </Select>
             </header>
 
-            <div className="min-h-0 flex-1 p-6">
+            <div className="min-h-0 flex-1">
                 {!schema && (
                     <EmptyState message="Select a schema to generate its database diagram." />
                 )}
@@ -197,7 +197,7 @@ function RelationshipDiagram({
     }
 
     return (
-        <div className="relative h-[calc(100vh-9rem)] overflow-hidden rounded-lg border bg-slate-50">
+        <div className="relative h-[calc(100vh-4.5rem)] overflow-hidden bg-slate-50">
             <div className="pointer-events-none absolute top-3 left-3 z-10 rounded-md border bg-white/90 px-2 py-1 text-xs text-slate-500 shadow-sm">
                 Ctrl + scroll to zoom · Drag tables to move
             </div>

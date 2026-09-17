@@ -17,6 +17,7 @@ import { loadTableData } from '#/internal/functions'
 import { EditableRow } from './editable-row'
 
 import type { EditableRowHandle } from './editable-row'
+import { Checkbox } from '#/components/ui/checkbox'
 
 export function TableDisplay() {
     const [addingRow, setAddingRow] = useState(false)
@@ -160,19 +161,25 @@ export function TableDisplay() {
                 </div>
             </div>
 
-            <div className="scrollbar-thin overflow-auto border-y">
+            <div className="overflow-auto border-y">
                 <table className="w-full border-collapse text-sm">
                     <thead className="bg-muted">
                         <tr>
-                            {tableDataQuery.data.columns.map((column) => (
+                            {tableDataQuery.data.columns.map((column, colIdx) => (
                                 <th
                                     key={column.name}
                                     scope="col"
-                                    className="w-64 max-w-64 border-b px-3 py-2 text-left font-medium"
+                                    className="w-64 max-w-64 border-b border-l first:border-l-0 text-[13px] px-3 py-2 text-left font-medium"
                                 >
-                                    <span className="block truncate" title={column.name}>
-                                        {column.name}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {colIdx == 0 && <Checkbox />}
+                                        <span
+                                            className="block truncate capitalize"
+                                            title={column.name}
+                                        >
+                                            {column.name.replaceAll('_', ' ')}
+                                        </span>
+                                    </div>
                                 </th>
                             ))}
                         </tr>
@@ -190,9 +197,15 @@ export function TableDisplay() {
                         )}
                         {tableDataQuery.data.rows.map((row, rowIndex) => (
                             <tr key={rowIndex}>
-                                {tableDataQuery.data.columns.map((column) => (
-                                    <td key={column.name} className="w-64 max-w-64 px-3 py-2">
-                                        <TableCell value={row[column.name]} />
+                                {tableDataQuery.data.columns.map((column, colIdx) => (
+                                    <td
+                                        key={column.name}
+                                        className="w-64 max-w-64 px-3 py-1.5 border-l first:border-l-0"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {colIdx == 0 && <Checkbox />}
+                                            <TableCell value={row[column.name]} />
+                                        </div>
                                     </td>
                                 ))}
                             </tr>
@@ -212,7 +225,7 @@ function TableCell({ value }: { value: unknown }) {
     const displayValue = formatCell(value)
 
     return (
-        <span className="block truncate" title={displayValue}>
+        <span className="block truncate text-[13px] text-mist-800" title={displayValue}>
             {displayValue}
         </span>
     )

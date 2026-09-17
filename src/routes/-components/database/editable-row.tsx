@@ -88,7 +88,10 @@ export const EditableRow = forwardRef<EditableRowHandle, EditableRowProps>(funct
                     const metadata = metadataByColumn.get(columnName)
 
                     return (
-                        <td key={columnName} className="w-64 max-w-64 px-2 py-2">
+                        <td
+                            key={columnName}
+                            className="w-64 max-w-64 px-2 py-1.5 first:border-l-0 border-l "
+                        >
                             {metadataQuery.isPending && (
                                 <span className="text-xs text-muted-foreground">Loading…</span>
                             )}

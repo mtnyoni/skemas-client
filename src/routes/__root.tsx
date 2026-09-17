@@ -8,7 +8,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
-import { CodeBracketIcon, ShareIcon, TableCellsIcon } from '@heroicons/react/24/outline'
+import { CircleStackIcon, CodeBracketIcon, TableCellsIcon } from '@heroicons/react/24/outline'
 
 interface MyRouterContext {
     queryClient: QueryClient
@@ -71,8 +71,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function Sidebar() {
     return (
-        <aside className="w-20 shrink-0 p-3">
-            <nav aria-label="Database tools" className="space-y-1">
+        <aside className="flex h-screen w-20 shrink-0 flex-col items-center gap-3 bg-mist-100 pt-6">
+            <Link
+                to="/"
+                aria-label="Skemas home"
+                className="rounded-lg p-2 text-foreground transition-colors duration-150 hover:bg-mist-200"
+            >
+                <CircleStackIcon className="size-6 stroke-2 stroke-mist-50 fill-primary" />
+            </Link>
+
+            <nav className="flex w-full flex-col items-center gap-3 border-mist-200 pt-3">
                 <SidebarItem to="/" label="Tables" exact />
                 <SidebarItem to="/diagrams" label="Diagrams" />
                 <SidebarItem to="/queries" label="Queries" />
@@ -81,9 +89,53 @@ function Sidebar() {
     )
 }
 
+function DiagramIcon(props: React.SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            aria-hidden="true"
+            data-slot="icon"
+            {...props}
+        >
+            <rect
+                x="9"
+                y="2"
+                width="6"
+                height="5"
+                rx="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <rect
+                x="2"
+                y="15"
+                width="6"
+                height="5"
+                rx="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <rect
+                x="16"
+                y="15"
+                width="6"
+                height="5"
+                rx="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v4m-7 4v-4h14v4" />
+        </svg>
+    )
+}
+
 const sidebarIcons = {
     Tables: TableCellsIcon,
-    Diagrams: ShareIcon,
+    Diagrams: DiagramIcon,
     Queries: CodeBracketIcon,
 } as const
 
@@ -100,14 +152,15 @@ function SidebarItem({ to, label, exact = false }: SidebarItemProps) {
         <Link
             to={to}
             activeOptions={{ exact }}
-            className="flex w-full flex-col items-center gap-2 rounded-md px-2 py-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            activeProps={{ className: 'bg-accent text-foreground' }}
+            title={label}
+            className="flex size-8 flex-col items-center justify-center rounded-xl transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            activeProps={{ className: 'bg-primary/10 text-primary' }}
             inactiveProps={{
-                className: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                className: 'text-muted-foreground hover:bg-mist-200 hover:text-foreground',
             }}
         >
-            <Icon className="size-4" aria-hidden="true" />
-            {label}
+            <Icon className="size-5 stroke-2" aria-hidden="true" />
+            <span className="sr-only">{label}</span>
         </Link>
     )
 }

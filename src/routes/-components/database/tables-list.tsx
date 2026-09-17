@@ -29,18 +29,18 @@ export function TablesList() {
 
     return (
         <div className="space-y-2">
-            <h2 className="text-sm font-medium">Tables</h2>
+            <h2 className="text-xs text-muted-foreground font-medium">Tables</h2>
 
             {tablesQuery.isPending && (
-                <p className="text-sm text-muted-foreground">Loading tables…</p>
+                <p className="text-[13px] text-muted-foreground">Loading tables…</p>
             )}
 
             {tablesQuery.isError && (
-                <p className="text-sm text-destructive">Unable to load tables.</p>
+                <p className="text-[13px] text-destructive">Unable to load tables.</p>
             )}
 
             {tablesQuery.isSuccess && tablesQuery.data.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                     No tables found in {selectedSchema}.
                 </p>
             )}
@@ -51,7 +51,7 @@ export function TablesList() {
                         <li key={table_name}>
                             <button
                                 type="button"
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-accent data-[selected=true]:bg-accent data-[selected=true]:font-medium"
+                                className="w-full px-3 py-1.5 text-left text-[13px] hover:bg-accent data-[selected=true]:bg-accent data-[selected=true]:font-medium"
                                 data-selected={selectedTable === table_name}
                                 onClick={() => selectTable(table_name)}
                             >
