@@ -10,6 +10,13 @@ import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
     resolve: { tsconfigPaths: true },
+    build: {
+        rolldownOptions: {
+            checks: {
+                moduleLevelDirective: false,
+            },
+        },
+    },
     plugins: [
         devtools(),
         nitro({ rollupConfig: { external: [/^@sentry\//] } }),
