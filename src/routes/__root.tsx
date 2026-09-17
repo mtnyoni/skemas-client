@@ -1,4 +1,4 @@
-import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
+import { HeadContent, Link, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
@@ -47,21 +47,25 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 <main className="flex min-h-screen">
                     <aside className="w-20 shrink-0 border-r p-3">
                         <nav aria-label="Database tools" className="space-y-1">
-                            <button
-                                type="button"
-                                aria-current="page"
-                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm"
-                            >
-                                <TableCellsIcon className="size-4" aria-hidden="true" />
-                                Tables
-                            </button>
-                            <button
-                                type="button"
-                                className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                            >
-                                <ShareIcon className="size-4" aria-hidden="true" />
-                                Diagrams
-                            </button>
+                            <Link to="/">
+                                <button
+                                    type="button"
+                                    aria-current="page"
+                                    className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm"
+                                >
+                                    <TableCellsIcon className="size-4" aria-hidden="true" />
+                                    Tables
+                                </button>
+                            </Link>
+                            <Link to="/diagrams">
+                                <button
+                                    type="button"
+                                    className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                                >
+                                    <ShareIcon className="size-4" aria-hidden="true" />
+                                    Diagrams
+                                </button>
+                            </Link>
                             <button
                                 type="button"
                                 className="flex tex-xs font-medium flex-col w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"

@@ -38,3 +38,15 @@ export const loadTableData = createServerFn({ method: 'GET' })
             order: data.order,
         })
     })
+
+export const loadDBRelationships = createServerFn({ method: 'GET' })
+    .validator(
+        z.object({
+            schema: z.string().min(1),
+        }),
+    )
+    .handler(async ({ data }) => {
+        const { getDBRelationships } = await import('./index')
+
+        return getDBRelationships(data.schema)
+    })

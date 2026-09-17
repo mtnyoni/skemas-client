@@ -39,7 +39,7 @@ export const Route = createFileRoute('/')({
 function Home() {
     return (
         <div className="flex min-w-0 gap-8 p-8">
-            <div className="w-full max-w-sm shrink-0 space-y-6">
+            <div className="w-full max-w-[20rem] shrink-0 space-y-6">
                 <SchemaSelect />
                 <TablesList />
             </div>
