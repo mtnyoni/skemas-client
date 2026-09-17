@@ -1,4 +1,4 @@
-FROM oven/bun:1-alpine AS dependencies
+FROM docker.io/oven/bun:1-alpine AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile

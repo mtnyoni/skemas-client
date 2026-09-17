@@ -1,5 +1,4 @@
-import { db } from '#/db'
-import { sql } from 'drizzle-orm'
+import { sql } from '#/db'
 
 export type DatabaseSchema = {
     schema_name: string
@@ -61,65 +60,60 @@ export type QueryValue =
     string | number | boolean | bigint | Date | null | QueryValue[] | { [key: string]: QueryValue }
 
 export async function getSchemas() {
-    const result = await db.execute<DatabaseSchema>(sql`
+    return sql<DatabaseSchema[]>`
         SELECT schema_name
         FROM information_schema.schemata
         WHERE schema_name NOT LIKE 'pg_%'
           AND schema_name != 'information_schema'
         ORDER BY schema_name
-    `)
-
-    return result.rows
+    `
 }
 
 export async function getTables(schema: string) {
-    const result = await db.execute<DatabaseTable>(sql`
+    return sql<DatabaseTable[]>`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = ${schema}
           AND table_type = 'BASE TABLE'
         ORDER BY table_name
-    `)
-
-    return result.rows
+    `
 }
 
 export async function runQuery<T extends Record<string, QueryValue>>(query: string) {
-    const result = await db.execute<T>(sql.raw(query))
+    const rows = await sql.unsafe<T[]>(query)
 
     return {
-        columns: result.fields.map((field) => ({
-            name: field.name,
-            tableId: field.tableID,
-            columnId: field.columnID,
-            dataTypeId: field.dataTypeID,
-            dataTypeSize: field.dataTypeSize,
-            dataTypeModifier: field.dataTypeModifier,
-            format: field.format,
-        })),
-        rows: result.rows,
+        columns: Object.keys(rows[0] ?? {}).map((name) => ({ name })),
+        rows,
     }
 }
 
-function quoteIdentifier(identifier: string) {
-    return `"${identifier.replaceAll('"', '""')}"`
-}
-
-export function getTableData(
+export async function getTableData(
     schema: string,
     table: string,
     options: { limit: number; sort?: string; order: 'asc' | 'desc' },
 ) {
-    const qualifiedTable = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
     const orderBy = options.sort
-        ? ` ORDER BY ${quoteIdentifier(options.sort)} ${options.order.toUpperCase()}`
-        : ''
+        ? sql`ORDER BY ${sql(options.sort)} ${options.order === 'asc' ? sql`ASC` : sql`DESC`}`
+        : sql``
+    const [rows, metadata] = await Promise.all([
+        sql<Record<string, QueryValue>[]>`
+            SELECT *
+            FROM ${sql(`${schema}.${table}`)}
+            ${orderBy}
+            LIMIT ${options.limit}
+        `,
+        getTableMetadata(schema, table),
+    ])
 
-    return runQuery(`SELECT * FROM ${qualifiedTable}${orderBy} LIMIT ${options.limit}`)
+    return {
+        columns: metadata.map((column) => ({ name: column.column_name })),
+        rows,
+    }
 }
 
 export async function getTableMetadata(schema: string, table: string) {
-    const result = await db.execute<DatabaseColumnMetadataRow>(sql`
+    const rows = await sql<DatabaseColumnMetadataRow[]>`
         SELECT
             table_column.column_name,
             table_column.data_type,
@@ -168,9 +162,9 @@ export async function getTableMetadata(schema: string, table: string) {
             table_column.is_generated,
             table_column.ordinal_position
         ORDER BY table_column.ordinal_position
-    `)
+    `
 
-    return result.rows.map((column) => {
+    return rows.map((column) => {
         const isApplicationGenerated =
             column.is_primary_key &&
             !column.is_identity &&
@@ -224,32 +218,22 @@ export async function insertTableRow(
         }
     }
     const entries = Object.entries(insertValues)
-    const qualifiedTable = sql`${sql.identifier(schema)}.${sql.identifier(table)}`
+    const qualifiedTable = sql(`${schema}.${table}`)
 
     if (entries.length === 0) {
-        const result = await db.execute(sql`INSERT INTO ${qualifiedTable} DEFAULT VALUES`)
-        return { rowCount: result.rowCount ?? 0 }
+        const rows = await sql`INSERT INTO ${qualifiedTable} DEFAULT VALUES RETURNING 1`
+        return { rowCount: rows.length }
     }
 
-    const columns = sql.join(
-        entries.map(([column]) => sql.identifier(column)),
-        sql`, `,
-    )
-    const parameters = sql.join(
-        entries.map(([, value]) => sql`${value}`),
-        sql`, `,
-    )
-    const result = await db.execute(
-        sql`INSERT INTO ${qualifiedTable} (${columns}) VALUES (${parameters})`,
-    )
+    const rows = await sql`INSERT INTO ${qualifiedTable} ${sql(insertValues)} RETURNING 1`
 
-    return { rowCount: result.rowCount ?? 0 }
+    return { rowCount: rows.length }
 }
 
 export async function getDBRelationships(schema: string) {
     const [tables, columns, relationships] = await Promise.all([
         getTables(schema),
-        db.execute<DatabaseDiagramColumn>(sql`
+        sql<DatabaseDiagramColumn[]>`
             SELECT
                 table_column.table_name,
                 table_column.column_name,
@@ -275,8 +259,8 @@ export async function getDBRelationships(schema: string) {
                 AND database_table.table_type = 'BASE TABLE'
             WHERE table_column.table_schema = ${schema}
             ORDER BY table_column.table_name, table_column.ordinal_position
-        `),
-        db.execute<DatabaseRelationship>(sql`
+        `,
+        sql<DatabaseRelationship[]>`
             SELECT
                 constraint_definition.conname AS constraint_name,
                 source_namespace.nspname AS source_schema,
@@ -311,11 +295,11 @@ export async function getDBRelationships(schema: string) {
             WHERE constraint_definition.contype = 'f'
               AND source_namespace.nspname = ${schema}
             ORDER BY source_table.relname, constraint_definition.conname, source_key.position
-        `),
+        `,
     ])
 
     const columnsByTable = new Map<string, DatabaseDiagramColumn[]>()
-    for (const column of columns.rows) {
+    for (const column of columns) {
         const tableColumns = columnsByTable.get(column.table_name) ?? []
         tableColumns.push(column)
         columnsByTable.set(column.table_name, tableColumns)
@@ -327,6 +311,6 @@ export async function getDBRelationships(schema: string) {
 
     return {
         tables: diagramTables,
-        relationships: relationships.rows,
+        relationships,
     }
 }

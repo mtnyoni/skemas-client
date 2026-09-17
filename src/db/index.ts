@@ -1,15 +1,12 @@
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import { SQL } from 'bun'
 
-const pool = new Pool({
-    host: requiredEnv('DB_HOST'),
+export const sql = new SQL({
+    hostname: requiredEnv('DB_HOST'),
     port: databasePort(),
-    user: requiredEnv('DB_USER'),
+    username: requiredEnv('DB_USER'),
     password: requiredEnv('DB_PASSWORD'),
     database: requiredEnv('DB_NAME'),
 })
-
-export const db = drizzle(pool)
 
 function requiredEnv(name: string) {
     const value = process.env[name]
