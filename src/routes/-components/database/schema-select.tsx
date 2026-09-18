@@ -23,8 +23,8 @@ export function SchemaSelect() {
     }
 
     return (
-        <div className="space-y-2">
-            <label htmlFor="database-schema" className="text-sm font-medium">
+        <div className="space-y-2 px-2">
+            <label htmlFor="database-schema" className="text-xs text-mist-500 font-medium">
                 Database schema
             </label>
 

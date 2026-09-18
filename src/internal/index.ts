@@ -70,12 +70,23 @@ export async function getSchemas() {
     `
 }
 
-export async function getTables(schema: string) {
+export async function getTables(schema: string, query?: string) {
+    if (!query) {
+        return sql<DatabaseTable[]>`
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = ${schema}
+              AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+        `
+    }
+
     return sql<DatabaseTable[]>`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = ${schema}
           AND table_type = 'BASE TABLE'
+          AND table_name ILIKE ${'%' + query + '%'}
         ORDER BY table_name
     `
 }

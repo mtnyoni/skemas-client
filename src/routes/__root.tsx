@@ -71,16 +71,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function Sidebar() {
     return (
-        <aside className="flex h-screen w-20 shrink-0 flex-col items-center gap-3 bg-mist-100 pt-6">
+        <aside className="flex h-screen w-12 shrink-0 flex-col items-center bg-mist-100 pt-3">
             <Link
                 to="/"
                 aria-label="Skemas home"
-                className="rounded-lg p-2 text-foreground transition-colors duration-150 hover:bg-mist-200"
+                className="rounded-lg p-1.5 transition-colors duration-150 bg-amber-900 text-mist-100"
             >
-                <CircleStackIcon className="size-6 stroke-2 stroke-mist-50 fill-primary" />
+                <CircleStackIcon className="size-5 stroke-2 stroke-mist-100" />
             </Link>
 
-            <nav className="flex w-full flex-col items-center gap-3 border-mist-200 pt-3">
+            <nav className="flex w-full flex-col items-center gap-1 border-mist-200 pt-3">
                 <SidebarItem to="/" label="Tables" exact />
                 <SidebarItem to="/diagrams" label="Diagrams" />
                 <SidebarItem to="/queries" label="Queries" />
@@ -153,13 +153,13 @@ function SidebarItem({ to, label, exact = false }: SidebarItemProps) {
             to={to}
             activeOptions={{ exact }}
             title={label}
-            className="flex size-8 flex-col items-center justify-center rounded-xl transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            activeProps={{ className: 'bg-primary/10 text-primary' }}
+            className="flex size-8 flex-col items-center justify-center rounded transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            activeProps={{ className: 'bg-mist-200 text-primary' }}
             inactiveProps={{
                 className: 'text-muted-foreground hover:bg-mist-200 hover:text-foreground',
             }}
         >
-            <Icon className="size-5 stroke-2" aria-hidden="true" />
+            <Icon className="size-4 text-mist-700" aria-hidden="true" />
             <span className="sr-only">{label}</span>
         </Link>
     )

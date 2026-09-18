@@ -11,12 +11,13 @@ export const loadTables = createServerFn({ method: 'GET' })
     .validator(
         z.object({
             schema: z.string().min(1),
+            tableQuery: z.optional(z.string()),
         }),
     )
-    .handler(async ({ data }) => {
+    .handler(async ({ data: { schema, tableQuery: query } }) => {
         const { getTables } = await import('./index')
 
-        return runDatabaseOperation('load tables', () => getTables(data.schema))
+        return runDatabaseOperation('load tables', () => getTables(schema, query))
     })
 
 export const loadTableData = createServerFn({ method: 'GET' })
