@@ -7,6 +7,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select'
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from '#/components/ui/combobox'
 
 export function SchemaSelect() {
     const schemas = useLoaderData({ from: '/' })
@@ -28,19 +36,23 @@ export function SchemaSelect() {
                 Database schema
             </label>
 
-            <Select value={selectedSchema ?? null} onValueChange={selectSchema}>
-                <SelectTrigger id="database-schema" className="w-full">
-                    <SelectValue placeholder="Select a schema" />
-                </SelectTrigger>
-                <SelectContent>
-                    {schemas.map(({ schema_name }) => (
-                        <SelectItem key={schema_name} value={schema_name}>
-                            {schema_name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-
+            <Combobox
+                items={schemas.map((item) => item.schema_name)}
+                value={selectedSchema ?? null}
+                onValueChange={selectSchema}
+            >
+                <ComboboxInput placeholder="Select a framework" />
+                <ComboboxContent>
+                    <ComboboxEmpty>No items found.</ComboboxEmpty>
+                    <ComboboxList>
+                        {(item) => (
+                            <ComboboxItem key={item} value={item}>
+                                {item}
+                            </ComboboxItem>
+                        )}
+                    </ComboboxList>
+                </ComboboxContent>
+            </Combobox>
             {schemas.length === 0 && (
                 <p className="text-sm text-muted-foreground">No schemas found.</p>
             )}

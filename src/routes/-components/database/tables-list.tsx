@@ -12,6 +12,8 @@ import {
 } from '#/components/ui/input-group'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SpinningLoader } from '#/components/ui/spinner'
+import { useHotkey } from '@tanstack/react-hotkeys'
 
 export function TablesList() {
     return (
@@ -31,6 +33,9 @@ function TableNameSearch() {
     const [TablesQuery, setTablesQuery] = useState(search.tableQuery ?? '')
     const [searching, setSearching] = useState(false)
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const inputRef = useRef<HTMLInputElement | null>(null)
+
+    useHotkey('Mod+K', () => inputRef.current?.focus())
 
     useEffect(() => {
         return () => {
@@ -65,12 +70,13 @@ function TableNameSearch() {
                 <MagnifyingGlassIcon className="text-muted-foreground size-3.5" />
             </InputGroupAddon>
             <InputGroupInput
-                placeholder="Search tables…"
+                ref={inputRef}
+                placeholder="Ctrl+K or Click to search"
                 value={TablesQuery}
                 onChange={(event) => handleSearchChange(event.target.value)}
             />
             {searching ? (
-                <InputGroupAddon>..</InputGroupAddon>
+                <SpinningLoader className="mr-1" />
             ) : TablesQuery.trim() !== '' ? (
                 <InputGroupButton onClick={() => handleSearchChange('')}>
                     <XMarkIcon />
@@ -91,7 +97,7 @@ export function TablesNames() {
         error,
         data: tables,
     } = useQuery({
-        queryKey: ['tables', selectedSchema],
+        queryKey: ['tables', selectedSchema, tableQuery],
         queryFn: () => getTables({ data: { schema: selectedSchema!, tableQuery } }),
         enabled: selectedSchema !== undefined,
     })
