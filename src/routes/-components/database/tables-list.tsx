@@ -153,8 +153,8 @@ export function TablesNames() {
     return (
         <div className="space-y-2">
             <ul>
-                {tables.map(({ table_name }) => (
-                    <li key={table_name}>
+                {tables.map(({ table_name }, index) => (
+                    <li key={table_name + `${index}`}>
                         <button
                             type="button"
                             className="relative before:h-5 before:top-1/2 before:-translate-y-1/2 before:absolute before:w-0.5 before:rounded-full data-selected:before:bg-amber-700 overflow-hidden before:ml-0 before:inset-0 rounded-md w-full text-mist-800 px-2 h-8 text-left text-[13px] hover:bg-accent data-[selected=true]:bg-accent data-[selected=true]:font-medium"

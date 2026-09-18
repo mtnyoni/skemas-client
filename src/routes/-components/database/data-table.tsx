@@ -12,8 +12,8 @@ import {
     TableRow,
 } from '#/components/ui/table'
 
-import { features } from '../../routes/-components/database/data-table-features'
-import type { DataTableFeatures } from '../../routes/-components/database/data-table-features'
+import { features } from './data-table-features'
+import type { DataTableFeatures } from './data-table-features'
 
 interface DataTableProps<TData extends RowData, TValue = unknown> {
     columns: ColumnDef<DataTableFeatures, TData, TValue>[]

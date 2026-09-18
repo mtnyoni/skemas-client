@@ -7,7 +7,7 @@ import { createTableRow, loadTableMetadata } from '#/internal/functions'
 
 import type { DatabaseColumnMetadata, InsertValue } from '#/internal'
 
-const NULL_VALUE = '__SKEMAS_NULL__'
+export const NULL_VALUE = '__SKEMAS_NULL__'
 
 export type EditableRowHandle = {
     save: () => void
@@ -120,7 +120,7 @@ export const EditableRow = forwardRef<EditableRowHandle, EditableRowProps>(funct
     )
 })
 
-function InlineColumnControl({
+export function InlineColumnControl({
     column,
     value,
     onChange,

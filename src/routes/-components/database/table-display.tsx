@@ -1,9 +1,9 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { ArrowDownIcon, ArrowsUpDownIcon, XMarkIcon } from '@heroicons/react/16/solid'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 import { Button } from '#/components/ui/button'
 import {
@@ -13,17 +13,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select'
-import { loadTableData } from '#/internal/functions'
+import { loadTableData, loadTableMetadata, createTableRow } from '#/internal/functions'
 
-import type { EditableRowHandle } from './editable-row'
+import { InlineColumnControl, NULL_VALUE } from './editable-row'
 import { Checkbox } from '#/components/ui/checkbox'
-import type { QueryValue } from '#/internal'
+import type { QueryValue, InsertValue } from '#/internal'
 import type postgres from 'postgres'
 import { InputGroup, InputGroupAddon } from '#/components/ui/input-group'
 import { Popover, PopoverContent, PopoverTrigger } from '#/components/ui/popover'
 import { createColumnHelper } from '@tanstack/react-table'
-import type { DataTableFeatures } from '#/routes/-components/database/data-table-features'
-import { DataTable } from '#/components/ui/data-table'
+import type { DataTableFeatures } from '#/components/ui/data-table-features'
+import { DataTable } from '#/routes/-components/database/data-table'
 
 export function TableDisplay() {
     const {
@@ -90,9 +90,79 @@ export function TableContents({
     readonly contents: TableContents
 }) {
     const navigate = useNavigate({ from: '/' })
-    const [addingRow, setAddingRow] = useState(false)
-    const editableRowRef = useRef<EditableRowHandle>(null)
+    const queryClient = useQueryClient()
     const { schema: selectedSchema, sort, order } = useSearch({ from: '/' })
+
+    const [addingRow, setAddingRow] = useState(false)
+    const [newRowValues, setNewRowValues] = useState<Record<string, string>>({})
+    const [validationError, setValidationError] = useState<string | null>(null)
+
+    // Stable per-"add row" session sentinel object; identity is used to
+    // detect which row in the table is the in-progress draft row.
+    const newRowSentinel = useMemo(() => ({}) as Record<string, QueryValue>, [addingRow])
+
+    const getMetadata = useServerFn(loadTableMetadata)
+    const metadataQuery = useQuery({
+        queryKey: ['table-metadata-v4', selectedSchema, tableName],
+        queryFn: () => getMetadata({ data: { schema: selectedSchema!, table: tableName } }),
+        staleTime: Number.POSITIVE_INFINITY,
+        enabled: addingRow,
+    })
+    const metadataByColumn = useMemo(
+        () => new Map(metadataQuery.data?.map((column) => [column.column_name, column]) ?? []),
+        [metadataQuery.data],
+    )
+
+    const addRow = useServerFn(createTableRow)
+    const createRow = useMutation({
+        mutationFn: (row: Record<string, InsertValue>) =>
+            addRow({ data: { schema: selectedSchema!, table: tableName, values: row } }),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: ['table-data', selectedSchema, tableName],
+            })
+            setAddingRow(false)
+            setNewRowValues({})
+            setValidationError(null)
+        },
+    })
+
+    function startAddingRow() {
+        setAddingRow(true)
+        setNewRowValues({})
+        setValidationError(null)
+    }
+
+    function cancelAddingRow() {
+        setAddingRow(false)
+        setNewRowValues({})
+        setValidationError(null)
+    }
+
+    function saveNewRow() {
+        if (!metadataQuery.data) return
+
+        const missingColumn = metadataQuery.data.find(
+            (column) =>
+                !column.is_auto_generated &&
+                !column.is_nullable &&
+                column.column_default === null &&
+                !newRowValues[column.column_name],
+        )
+        if (missingColumn) {
+            setValidationError(`${missingColumn.column_name} is required.`)
+            return
+        }
+
+        const row: Record<string, InsertValue> = {}
+        for (const column of metadataQuery.data) {
+            if (column.is_auto_generated) continue
+            const value = newRowValues[column.column_name]
+            if (!value) continue
+            row[column.column_name] = value === NULL_VALUE ? null : value
+        }
+        createRow.mutate(row)
+    }
 
     const columnHelper = createColumnHelper<DataTableFeatures, Record<string, QueryValue>>()
     const columns = useMemo(
@@ -109,6 +179,32 @@ export function TableContents({
                         </div>
                     ),
                     cell: (info) => {
+                        // Draft "add row" — render an editable control instead of a value.
+                        if (info.row.original === newRowSentinel) {
+                            if (metadataQuery.isPending) {
+                                return (
+                                    <span className="text-xs text-muted-foreground">Loading…</span>
+                                )
+                            }
+                            if (metadataQuery.isError) {
+                                return <span className="text-xs text-destructive">Unavailable</span>
+                            }
+                            const meta = metadataByColumn.get(column.name)
+                            if (!meta) return null
+                            return (
+                                <InlineColumnControl
+                                    column={meta}
+                                    value={newRowValues[column.name] ?? ''}
+                                    onChange={(value) =>
+                                        setNewRowValues((current) => ({
+                                            ...current,
+                                            [column.name]: value,
+                                        }))
+                                    }
+                                />
+                            )
+                        }
+
                         const value = info.getValue()
 
                         if (value === null) {
@@ -120,7 +216,6 @@ export function TableContents({
                         }
 
                         if (typeof value === 'object') {
-                            // arrays and jsonb objects
                             return (
                                 <code className="text-xs text-muted-foreground truncate block">
                                     {JSON.stringify(value)}
@@ -132,7 +227,20 @@ export function TableContents({
                     },
                 }),
             ),
-        [contents.columns, columnHelper],
+        [
+            contents.columns,
+            columnHelper,
+            newRowSentinel,
+            newRowValues,
+            metadataByColumn,
+            metadataQuery.isPending,
+            metadataQuery.isError,
+        ],
+    )
+
+    const tableData = useMemo(
+        () => (addingRow ? [newRowSentinel, ...contents.rows] : contents.rows),
+        [addingRow, newRowSentinel, contents.rows],
     )
 
     return (
@@ -156,20 +264,17 @@ export function TableContents({
                             <>
                                 <Button
                                     type="button"
-                                    onClick={() => editableRowRef.current?.save()}
+                                    onClick={saveNewRow}
+                                    disabled={createRow.isPending}
                                 >
                                     Save row
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setAddingRow(false)}
-                                >
+                                <Button type="button" variant="outline" onClick={cancelAddingRow}>
                                     Cancel
                                 </Button>
                             </>
                         ) : (
-                            <Button type="button" onClick={() => setAddingRow(true)}>
+                            <Button type="button" onClick={startAddingRow}>
                                 <PlusIcon data-icon="inline-start" />
                                 Add row
                             </Button>
@@ -218,9 +323,14 @@ export function TableContents({
                         </Button>
                     )}
                 </div>
+                {(validationError || createRow.isError) && (
+                    <p className="text-xs text-destructive px-3 mt-1">
+                        {validationError ?? 'Unable to add the row.'}
+                    </p>
+                )}
             </div>
 
-            <DataTable columns={columns} data={contents.rows} />
+            <DataTable columns={columns} data={tableData} />
         </div>
     )
 }
