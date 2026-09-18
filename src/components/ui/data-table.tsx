@@ -15,16 +15,19 @@ import {
 import { features } from '../../routes/-components/database/data-table-features'
 import type { DataTableFeatures } from '../../routes/-components/database/data-table-features'
 
-interface DataTableProps<TData extends RowData> {
-    columns: ColumnDef<DataTableFeatures, TData>[]
+interface DataTableProps<TData extends RowData, TValue = unknown> {
+    columns: ColumnDef<DataTableFeatures, TData, TValue>[]
     data: TData[]
 }
 
-export function DataTable<TData extends RowData>({ columns, data }: DataTableProps<TData>) {
+export function DataTable<TData extends RowData, TValue = unknown>({
+    columns,
+    data,
+}: DataTableProps<TData, TValue>) {
     const table = useTable({
         features,
         data,
-        columns,
+        columns: columns as ColumnDef<DataTableFeatures, TData, unknown>[],
     })
 
     return (
