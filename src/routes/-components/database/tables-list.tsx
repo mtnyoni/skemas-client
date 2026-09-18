@@ -14,12 +14,13 @@ import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SpinningLoader } from '#/components/ui/spinner'
 import { useHotkey } from '@tanstack/react-hotkeys'
+import { Kbd } from '#/components/ui/kbd'
 
 export function TablesList() {
     return (
         <div className="space-y-2">
-            <h2 className="text-xs text-mist-500 font-medium">Tables</h2>
-            <div>
+            <div className="space-y-0.5">
+                <h2 className="text-xs text-mist-500 font-medium">Tables</h2>
                 <TableNameSearch />
             </div>
             <TablesNames />
@@ -65,13 +66,13 @@ function TableNameSearch() {
     )
 
     return (
-        <InputGroup className="mt-3 max-w-xs">
+        <InputGroup className="max-w-xs">
             <InputGroupAddon>
                 <MagnifyingGlassIcon className="text-muted-foreground size-3.5" />
             </InputGroupAddon>
             <InputGroupInput
                 ref={inputRef}
-                placeholder="Ctrl+K or Click to search"
+                placeholder="Search tables..."
                 value={TablesQuery}
                 onChange={(event) => handleSearchChange(event.target.value)}
             />
@@ -81,7 +82,9 @@ function TableNameSearch() {
                 <InputGroupButton onClick={() => handleSearchChange('')}>
                     <XMarkIcon />
                 </InputGroupButton>
-            ) : null}
+            ) : (
+                <Kbd className="mr-1">Ctrl+K</Kbd>
+            )}
         </InputGroup>
     )
 }
