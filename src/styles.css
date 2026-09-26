@@ -195,6 +195,14 @@ body {
     background: var(--border);
 }
 
+.no-scrollbar {
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
 a {
     color: var(--lagoon-deep);
     text-decoration-color: rgba(50, 143, 151, 0.4);

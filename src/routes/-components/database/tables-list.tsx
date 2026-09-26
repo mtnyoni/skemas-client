@@ -18,12 +18,14 @@ import { Kbd } from '#/components/ui/kbd'
 
 export function TablesList() {
     return (
-        <div className="space-y-2">
-            <div className="space-y-0.5">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="shrink-0 space-y-0.5">
                 <h2 className="text-xs text-mist-500 font-medium">Tables</h2>
                 <TableNameSearch />
             </div>
-            <TablesNames />
+            <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar overscroll-contain pb-3">
+                <TablesNames />
+            </div>
         </div>
     )
 }

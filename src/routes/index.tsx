@@ -34,15 +34,17 @@ const searchSchema = z
 export const Route = createFileRoute('/')({
     validateSearch: searchSchema,
     loader: () => loadSchemas(),
+
     component: RouteComponent,
+    errorComponent: ({ error }) => JSON.stringify(error),
 })
 
 function RouteComponent() {
     const { schema } = Route.useSearch()
 
     return (
-        <div className="flex min-w-0">
-            <div className="w-full h-[calc(100dvh-1rem)] max-w-56 shrink-0 space-y-6 pt-3 px-2 border-r">
+        <div className="flex h-full min-h-0 min-w-0">
+            <div className="flex h-full min-h-0 w-full max-w-56 shrink-0 flex-col gap-6 border-r px-2 pt-3">
                 <SchemaSelect />
                 {schema ? (
                     <TablesList />
@@ -55,7 +57,7 @@ function RouteComponent() {
                     </div>
                 )}
             </div>
-            <div className="min-w-0 flex-1 pt-2">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto no-scrollbar overscroll-contain pt-2">
                 <TableDisplay />
             </div>
         </div>
