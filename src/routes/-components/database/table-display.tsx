@@ -1,7 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { ArrowUpIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { ArrowDownIcon, ArrowsUpDownIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import React, { useMemo, useState } from 'react'
 
@@ -13,16 +13,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select'
-import { loadTableData, loadTableMetadata, createTableRow } from '#/internal/functions'
+import {
+    loadTableData,
+    loadTableMetadata,
+    createTableRow,
+    updateTableRow,
+} from '#/internal/functions'
 
 import { InlineColumnControl, NULL_VALUE } from './editable-row'
+import { EditRowCell } from './edit-row-cell'
 import { Checkbox } from '#/components/ui/checkbox'
-import type { QueryValue, InsertValue } from '#/internal'
+import type { DatabaseColumnMetadata, QueryValue, InsertValue } from '#/internal'
 import type postgres from 'postgres'
 import { InputGroup, InputGroupAddon } from '#/components/ui/input-group'
 import { Popover, PopoverContent, PopoverTrigger } from '#/components/ui/popover'
 import { createColumnHelper } from '@tanstack/react-table'
-import type { DataTableFeatures } from '#/components/ui/data-table-features'
+import type { ColumnDef } from '@tanstack/react-table'
+import type { DataTableFeatures } from './data-table-features'
 import { DataTable } from '#/routes/-components/database/data-table'
 
 export function TableDisplay() {
@@ -89,25 +96,29 @@ export function TableContents({
     readonly tableName: string
     readonly contents: TableContents
 }) {
-    const navigate = useNavigate({ from: '/' })
     const queryClient = useQueryClient()
+    const navigate = useNavigate({ from: '/' })
     const { schema: selectedSchema, sort, order } = useSearch({ from: '/' })
 
     const [addingRow, setAddingRow] = useState(false)
     const [newRowValues, setNewRowValues] = useState<Record<string, string>>({})
     const [validationError, setValidationError] = useState<string | null>(null)
+    const [editingRow, setEditingRow] = useState<Record<string, QueryValue> | null>(null)
+    const [editValues, setEditValues] = useState<Record<string, string>>({})
+    const [editError, setEditError] = useState<string | null>(null)
 
     // Stable per-"add row" session sentinel object; identity is used to
     // detect which row in the table is the in-progress draft row.
-    const newRowSentinel = useMemo(() => ({}) as Record<string, QueryValue>, [addingRow])
+    const newRowSentinel = useMemo(() => ({}), [addingRow])
 
     const getMetadata = useServerFn(loadTableMetadata)
     const metadataQuery = useQuery({
         queryKey: ['table-metadata-v4', selectedSchema, tableName],
         queryFn: () => getMetadata({ data: { schema: selectedSchema!, table: tableName } }),
         staleTime: Number.POSITIVE_INFINITY,
-        enabled: addingRow,
+        enabled: addingRow || contents.rows.length > 0,
     })
+
     const metadataByColumn = useMemo(
         () => new Map(metadataQuery.data?.map((column) => [column.column_name, column]) ?? []),
         [metadataQuery.data],
@@ -126,6 +137,67 @@ export function TableContents({
             setValidationError(null)
         },
     })
+
+    const updateRow = useServerFn(updateTableRow)
+    const saveRow = useMutation({
+        mutationFn: ({
+            key,
+            values,
+        }: {
+            key: Record<string, string | number | boolean>
+            values: Record<string, InsertValue>
+        }) => updateRow({ data: { schema: selectedSchema!, table: tableName, key, values } }),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: ['table-data', selectedSchema, tableName],
+            })
+            setEditingRow(null)
+            setEditValues({})
+            setEditError(null)
+        },
+    })
+
+    function startEditingRow(row: Record<string, QueryValue>) {
+        saveRow.reset()
+        setEditingRow(row)
+        setEditValues({})
+        setEditError(null)
+    }
+
+    function cancelEditingRow() {
+        saveRow.reset()
+        setEditingRow(null)
+        setEditValues({})
+        setEditError(null)
+    }
+
+    function saveEditedRow() {
+        if (!editingRow || !metadataQuery.data) return
+        const key: Record<string, string | number | boolean> = {}
+        for (const column of metadataQuery.data.filter((item) => item.is_primary_key)) {
+            const value = editingRow[column.column_name]
+            if (value === null || typeof value === 'object') {
+                setEditError('This row has no usable primary key.')
+                return
+            }
+            key[column.column_name] = typeof value === 'bigint' ? String(value) : value
+        }
+        const values: Record<string, InsertValue> = {}
+        for (const [name, value] of Object.entries(editValues)) {
+            const column = metadataByColumn.get(name)
+            if (!column) continue
+            if (value === NULL_VALUE && !column.is_nullable) {
+                setEditError(`${name} cannot be null.`)
+                return
+            }
+            values[name] = value === NULL_VALUE ? null : value
+        }
+        if (Object.keys(values).length === 0) {
+            cancelEditingRow()
+            return
+        }
+        saveRow.mutate({ key, values })
+    }
 
     function startAddingRow() {
         setAddingRow(true)
@@ -149,6 +221,7 @@ export function TableContents({
                 column.column_default === null &&
                 !newRowValues[column.column_name],
         )
+
         if (missingColumn) {
             setValidationError(`${missingColumn.column_name} is required.`)
             return
@@ -164,79 +237,24 @@ export function TableContents({
         createRow.mutate(row)
     }
 
-    const columnHelper = createColumnHelper<DataTableFeatures, Record<string, QueryValue>>()
-    const columns = useMemo(
-        () =>
-            contents.columns.map((column, colIdx) =>
-                columnHelper.accessor((row) => row[column.name], {
-                    id: column.name,
-                    header: () => (
-                        <div className="flex items-center gap-2">
-                            {colIdx === 0 && <Checkbox />}
-                            <span className="block truncate capitalize" title={column.name}>
-                                {column.name.replaceAll('_', ' ')}
-                            </span>
-                        </div>
-                    ),
-                    cell: (info) => {
-                        // Draft "add row" — render an editable control instead of a value.
-                        if (info.row.original === newRowSentinel) {
-                            if (metadataQuery.isPending) {
-                                return (
-                                    <span className="text-xs text-muted-foreground">Loading…</span>
-                                )
-                            }
-                            if (metadataQuery.isError) {
-                                return <span className="text-xs text-destructive">Unavailable</span>
-                            }
-                            const meta = metadataByColumn.get(column.name)
-                            if (!meta) return null
-                            return (
-                                <InlineColumnControl
-                                    column={meta}
-                                    value={newRowValues[column.name] ?? ''}
-                                    onChange={(value) =>
-                                        setNewRowValues((current) => ({
-                                            ...current,
-                                            [column.name]: value,
-                                        }))
-                                    }
-                                />
-                            )
-                        }
-
-                        const value = info.getValue()
-
-                        if (value === null) {
-                            return <span className="text-gray-400 italic">null</span>
-                        }
-
-                        if (value instanceof Date) {
-                            return value.toLocaleString()
-                        }
-
-                        if (typeof value === 'object') {
-                            return (
-                                <code className="text-xs text-muted-foreground truncate block">
-                                    {JSON.stringify(value)}
-                                </code>
-                            )
-                        }
-
-                        return String(value)
-                    },
-                }),
-            ),
-        [
-            contents.columns,
-            columnHelper,
-            newRowSentinel,
-            newRowValues,
-            metadataByColumn,
-            metadataQuery.isPending,
-            metadataQuery.isError,
-        ],
-    )
+    const columns = useTableColumns({
+        contents,
+        newRowSentinel,
+        newRowValues,
+        setNewRowValues,
+        metadataByColumn,
+        metadataPending: metadataQuery.isPending,
+        metadataError: metadataQuery.isError,
+        editingRow,
+        editValues,
+        setEditValues,
+        canEdit: Boolean(metadataQuery.data?.some((column) => column.is_primary_key)),
+        startEditingRow,
+        cancelEditingRow,
+        saveEditedRow,
+        editPending: saveRow.isPending,
+        addingRow,
+    })
 
     const tableData = useMemo(
         () => (addingRow ? [newRowSentinel, ...contents.rows] : contents.rows),
@@ -274,7 +292,11 @@ export function TableContents({
                                 </Button>
                             </>
                         ) : (
-                            <Button type="button" onClick={startAddingRow}>
+                            <Button
+                                type="button"
+                                onClick={startAddingRow}
+                                disabled={editingRow !== null}
+                            >
                                 <PlusIcon data-icon="inline-start" />
                                 Add row
                             </Button>
@@ -328,11 +350,198 @@ export function TableContents({
                         {validationError ?? 'Unable to add the row.'}
                     </p>
                 )}
+                {(editError || saveRow.isError) && (
+                    <p className="text-xs text-destructive px-3 mt-1">
+                        {editError ??
+                            (saveRow.error instanceof Error
+                                ? saveRow.error.message
+                                : 'Unable to update the row.')}
+                    </p>
+                )}
             </div>
 
             <DataTable columns={columns} data={tableData} />
         </div>
     )
+}
+
+type TableColumnsOptions = {
+    contents: TableContents
+    newRowSentinel: Record<string, QueryValue>
+    newRowValues: Record<string, string>
+    setNewRowValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
+    metadataByColumn: Map<string, DatabaseColumnMetadata>
+    metadataPending: boolean
+    metadataError: boolean
+    editingRow: Record<string, QueryValue> | null
+    editValues: Record<string, string>
+    setEditValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
+    canEdit: boolean
+    startEditingRow: (row: Record<string, QueryValue>) => void
+    cancelEditingRow: () => void
+    saveEditedRow: () => void
+    editPending: boolean
+    addingRow: boolean
+}
+
+function useTableColumns({
+    contents,
+    newRowSentinel,
+    newRowValues,
+    setNewRowValues,
+    metadataByColumn,
+    metadataPending,
+    metadataError,
+    editingRow,
+    editValues,
+    setEditValues,
+    canEdit,
+    startEditingRow,
+    cancelEditingRow,
+    saveEditedRow,
+    editPending,
+    addingRow,
+}: TableColumnsOptions) {
+    return useMemo(() => {
+        const columnHelper = createColumnHelper<DataTableFeatures, Record<string, QueryValue>>()
+        const columns = contents.columns.map((column, colIdx) =>
+            columnHelper.accessor((row) => row[column.name], {
+                id: column.name,
+                header: () => (
+                    <div className="flex items-center gap-2">
+                        {colIdx === 0 && <Checkbox />}
+                        <span className="block truncate capitalize" title={column.name}>
+                            {column.name.replaceAll('_', ' ')}
+                        </span>
+                    </div>
+                ),
+                cell: (info) => {
+                    // Draft "add row" — render an editable control instead of a value.
+                    if (info.row.original === newRowSentinel) {
+                        if (metadataPending) {
+                            return <span className="text-xs text-muted-foreground">Loading…</span>
+                        }
+                        if (metadataError) {
+                            return <span className="text-xs text-destructive">Unavailable</span>
+                        }
+                        const meta = metadataByColumn.get(column.name)
+                        if (!meta) return null
+                        return (
+                            <InlineColumnControl
+                                column={meta}
+                                value={newRowValues[column.name] ?? ''}
+                                onChange={(value) =>
+                                    setNewRowValues((current) => ({
+                                        ...current,
+                                        [column.name]: value,
+                                    }))
+                                }
+                            />
+                        )
+                    }
+
+                    if (info.row.original === editingRow) {
+                        const meta = metadataByColumn.get(column.name)
+                        if (
+                            meta &&
+                            !meta.is_primary_key &&
+                            !meta.is_identity &&
+                            !meta.is_generated
+                        ) {
+                            return (
+                                <EditRowCell
+                                    column={meta}
+                                    originalValue={info.getValue()}
+                                    value={editValues[column.name]}
+                                    onChange={(value) =>
+                                        setEditValues((current) => ({
+                                            ...current,
+                                            [column.name]: value,
+                                        }))
+                                    }
+                                />
+                            )
+                        }
+                    }
+
+                    const value = info.getValue()
+
+                    if (value === null) {
+                        return <span className="text-gray-400 italic">null</span>
+                    }
+
+                    if (value instanceof Date) {
+                        return value.toLocaleString()
+                    }
+
+                    if (typeof value === 'object') {
+                        return (
+                            <code className="text-xs text-muted-foreground truncate block">
+                                {JSON.stringify(value)}
+                            </code>
+                        )
+                    }
+
+                    return String(value)
+                },
+            }),
+        )
+        if (!canEdit) return columns
+        return [
+            ...columns,
+            columnHelper.display({
+                id: 'row-actions',
+                header: 'Actions',
+                cell: ({ row }) => {
+                    if (row.original === newRowSentinel) return null
+                    if (row.original === editingRow) {
+                        return (
+                            <div className="flex gap-1">
+                                <Button size="xs" onClick={saveEditedRow} disabled={editPending}>
+                                    Save
+                                </Button>
+                                <Button
+                                    size="xs"
+                                    variant="outline"
+                                    onClick={cancelEditingRow}
+                                    disabled={editPending}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        )
+                    }
+                    return (
+                        <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => startEditingRow(row.original)}
+                            disabled={editingRow !== null || addingRow}
+                        >
+                            <PencilSquareIcon data-icon="inline-start" /> Edit
+                        </Button>
+                    )
+                },
+            }),
+        ] as ColumnDef<DataTableFeatures, Record<string, QueryValue>, QueryValue>[]
+    }, [
+        contents.columns,
+        newRowSentinel,
+        newRowValues,
+        metadataByColumn,
+        metadataPending,
+        metadataError,
+        setNewRowValues,
+        editingRow,
+        editValues,
+        setEditValues,
+        canEdit,
+        startEditingRow,
+        cancelEditingRow,
+        saveEditedRow,
+        editPending,
+        addingRow,
+    ])
 }
 
 function TableLimitFilter() {

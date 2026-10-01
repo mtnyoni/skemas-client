@@ -124,12 +124,18 @@ export function InlineColumnControl({
     column,
     value,
     onChange,
+    editing = false,
 }: {
     column: DatabaseColumnMetadata
     value: string
     onChange: (value: string) => void
+    editing?: boolean
 }) {
-    if (column.is_auto_generated) {
+    if (
+        editing
+            ? column.is_primary_key || column.is_identity || column.is_generated
+            : column.is_auto_generated
+    ) {
         return <span className="text-xs text-muted-foreground">Auto</span>
     }
 

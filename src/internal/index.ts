@@ -243,6 +243,47 @@ export async function insertTableRow(
     return { rowCount: rows.length }
 }
 
+export async function updateTableRowByKey(
+    schema: string,
+    table: string,
+    key: Record<string, string | number | boolean>,
+    values: Record<string, InsertValue>,
+) {
+    const metadata = await getTableMetadata(schema, table)
+    const keyColumns = metadata.filter((column) => column.is_primary_key)
+    if (
+        keyColumns.length === 0 ||
+        Object.keys(key).length !== keyColumns.length ||
+        keyColumns.some((column) => !(column.column_name in key))
+    ) {
+        throw new Error('A complete primary key is required to update a row.')
+    }
+
+    const writableColumns = new Set(
+        metadata
+            .filter(
+                (column) => !column.is_primary_key && !column.is_identity && !column.is_generated,
+            )
+            .map((column) => column.column_name),
+    )
+    const entries = Object.entries(values)
+    if (entries.length === 0 || entries.some(([column]) => !writableColumns.has(column))) {
+        throw new Error('Select at least one editable column to update.')
+    }
+    const conditions = keyColumns.map(
+        (column) => sql`${sql(column.column_name)} = ${key[column.column_name]}`,
+    )
+    const rows = await sql`
+        UPDATE ${sql(`${schema}.${table}`)}
+        SET ${sql(values)}
+        WHERE ${conditions.reduce((condition, next) => sql`${condition} AND ${next}`)}
+        RETURNING 1
+    `
+    if (rows.length !== 1) throw new Error('The row could not be found for updating.')
+
+    return { rowCount: rows.length }
+}
+
 export async function getDBRelationships(schema: string) {
     const [tables, columns, relationships] = await Promise.all([
         getTables(schema),

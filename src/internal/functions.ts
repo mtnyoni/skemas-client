@@ -85,6 +85,21 @@ export const createTableRow = createServerFn({ method: 'POST' })
         )
     })
 
+export const updateTableRow = createServerFn({ method: 'POST' })
+    .validator(
+        tableTargetSchema.extend({
+            key: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+            values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+        }),
+    )
+    .handler(async ({ data }) => {
+        const { updateTableRowByKey } = await import('./index')
+
+        return runDatabaseOperation('update table row', () =>
+            updateTableRowByKey(data.schema, data.table, data.key, data.values),
+        )
+    })
+
 async function runDatabaseOperation<T>(operation: string, run: () => Promise<T>): Promise<T> {
     try {
         return await run()
