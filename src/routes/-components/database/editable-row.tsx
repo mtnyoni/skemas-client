@@ -7,7 +7,8 @@ import { createTableRow, loadTableMetadata } from '#/internal/functions'
 
 import type { DatabaseColumnMetadata, InsertValue } from '#/internal'
 
-export const NULL_VALUE = '__SKEMAS_NULL__'
+import { NULL_VALUE } from './cell-constants'
+export { NULL_VALUE } from './cell-constants'
 
 export type EditableRowHandle = {
     save: () => void
@@ -125,29 +126,42 @@ export function InlineColumnControl({
     value,
     onChange,
     editing = false,
+    fullCell = false,
+    disabled = false,
+    label,
 }: {
     column: DatabaseColumnMetadata
     value: string
     onChange: (value: string) => void
     editing?: boolean
+    fullCell?: boolean
+    disabled?: boolean
+    label?: string
 }) {
     if (
         editing
             ? column.is_primary_key || column.is_identity || column.is_generated
             : column.is_auto_generated
     ) {
-        return <span className="text-xs text-muted-foreground">Auto</span>
+        return <span className="block px-3 py-2 text-xs text-muted-foreground">Auto</span>
     }
 
+    const cellClassName =
+        'block h-full w-full min-w-0 rounded-none border-0 bg-transparent px-3 py-2 text-sm outline-none focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 disabled:cursor-wait'
     const enumValues = Array.isArray(column.enum_values) ? column.enum_values : []
     if (enumValues.length > 0 || column.data_type === 'boolean') {
         const options = enumValues.length > 0 ? enumValues : ['true', 'false']
         return (
             <select
-                aria-label={column.column_name}
+                aria-label={label ?? column.column_name}
                 value={value}
+                disabled={disabled}
                 onChange={(event) => onChange(event.target.value)}
-                className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                className={
+                    fullCell
+                        ? cellClassName
+                        : 'h-7 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30'
+                }
             >
                 <option value="">{column.column_default ? 'Use default' : 'Select…'}</option>
                 {column.is_nullable && <option value={NULL_VALUE}>NULL</option>}
@@ -160,9 +174,25 @@ export function InlineColumnControl({
         )
     }
 
+    if (fullCell) {
+        return (
+            <input
+                aria-label={label ?? column.column_name}
+                value={value}
+                disabled={disabled}
+                onChange={(event) => onChange(event.target.value)}
+                type={inputType(column.data_type)}
+                step={isNumericType(column.data_type) ? 'any' : undefined}
+                placeholder={editing ? (column.is_nullable ? 'NULL' : '') : placeholder(column)}
+                title={column.data_type}
+                className={cellClassName}
+            />
+        )
+    }
+
     return (
         <Input
-            aria-label={column.column_name}
+            aria-label={label ?? column.column_name}
             value={value}
             onChange={(event) => onChange(event.target.value)}
             type={inputType(column.data_type)}
