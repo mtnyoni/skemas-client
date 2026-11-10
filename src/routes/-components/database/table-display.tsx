@@ -257,7 +257,7 @@ export function TableContents({
         (createRow.isError ? 'Unable to add the row.' : null)
 
     return (
-        <div className="space-y-3 pb-36">
+        <div className="space-y-3 pb-48">
             <div>
                 <div className="flex px-3 flex-wrap items-center justify-between gap-3">
                     <div>

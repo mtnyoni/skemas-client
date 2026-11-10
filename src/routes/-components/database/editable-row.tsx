@@ -3,11 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { forwardRef, useImperativeHandle, useState } from 'react'
 
 import { Input } from '#/components/ui/input'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '#/components/ui/select'
 import { createTableRow, loadTableMetadata } from '#/internal/functions'
 
 import type { DatabaseColumnMetadata, InsertValue } from '#/internal'
 
 import { NULL_VALUE } from './cell-constants'
+
 export { NULL_VALUE } from './cell-constants'
 
 export type EditableRowHandle = {
@@ -21,105 +29,108 @@ type EditableRowProps = {
     onSaved: () => void
 }
 
-export const EditableRow = forwardRef<EditableRowHandle, EditableRowProps>(function EditableRow(
-    { schema, table, columns, onSaved },
-    ref,
-) {
-    const [values, setValues] = useState<Record<string, string>>({})
-    const [validationError, setValidationError] = useState<string | null>(null)
-    const queryClient = useQueryClient()
-    const getMetadata = useServerFn(loadTableMetadata)
-    const addRow = useServerFn(createTableRow)
-    const metadataQuery = useQuery({
-        queryKey: ['table-metadata-v4', schema, table],
-        queryFn: () => getMetadata({ data: { schema, table } }),
-        staleTime: Number.POSITIVE_INFINITY,
-    })
-    const createRow = useMutation({
-        mutationFn: (row: Record<string, InsertValue>) =>
-            addRow({ data: { schema, table, values: row } }),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: ['table-data', schema, table] })
-            onSaved()
-        },
-    })
-    const metadataByColumn = new Map(
-        metadataQuery.data?.map((column) => [column.column_name, column]) ?? [],
-    )
+export const EditableRow = forwardRef<EditableRowHandle, EditableRowProps>(
+    function EditableRowComponent({ schema, table, columns, onSaved }, ref) {
+        const [values, setValues] = useState<Record<string, string>>({})
+        const [validationError, setValidationError] = useState<string | null>(null)
+        const queryClient = useQueryClient()
+        const getMetadata = useServerFn(loadTableMetadata)
+        const addRow = useServerFn(createTableRow)
 
-    function changeValue(column: string, value: string) {
-        setValues((current) => ({ ...current, [column]: value }))
-        setValidationError(null)
-    }
+        const metadataQuery = useQuery({
+            queryKey: ['table-metadata-v4', schema, table],
+            queryFn: () => getMetadata({ data: { schema, table } }),
+            staleTime: Number.POSITIVE_INFINITY,
+        })
 
-    function saveRow() {
-        if (!metadataQuery.data) return
+        const createRow = useMutation({
+            mutationFn: (row: Record<string, InsertValue>) =>
+                addRow({ data: { schema, table, values: row } }),
+            onSuccess: () => {
+                void queryClient.invalidateQueries({ queryKey: ['table-data', schema, table] })
+                onSaved()
+            },
+        })
 
-        const missingColumn = metadataQuery.data.find(
-            (column) =>
-                !column.is_auto_generated &&
-                !column.is_nullable &&
-                column.column_default === null &&
-                !values[column.column_name],
+        const metadataByColumn = new Map(
+            metadataQuery.data?.map((column) => [column.column_name, column]) ?? [],
         )
-        if (missingColumn) {
-            setValidationError(`${missingColumn.column_name} is required.`)
-            return
+
+        function changeValue(column: string, value: string) {
+            setValues((current) => ({ ...current, [column]: value }))
+            setValidationError(null)
         }
 
-        const row: Record<string, InsertValue> = {}
-        for (const column of metadataQuery.data) {
-            if (column.is_auto_generated) continue
+        function saveRow() {
+            if (!metadataQuery.data) return
 
-            const value = values[column.column_name]
-            if (!value) continue
-            row[column.column_name] = value === NULL_VALUE ? null : value
+            const missingColumn = metadataQuery.data.find(
+                (column) =>
+                    !column.is_auto_generated &&
+                    !column.is_nullable &&
+                    column.column_default === null &&
+                    !values[column.column_name],
+            )
+            if (missingColumn) {
+                setValidationError(`${missingColumn.column_name} is required.`)
+                return
+            }
+
+            const row: Record<string, InsertValue> = {}
+            for (const column of metadataQuery.data) {
+                if (column.is_auto_generated) continue
+
+                const value = values[column.column_name]
+                if (!value) continue
+                row[column.column_name] = value === NULL_VALUE ? null : value
+            }
+            createRow.mutate(row)
         }
-        createRow.mutate(row)
-    }
 
-    useImperativeHandle(ref, () => ({ save: saveRow }))
+        useImperativeHandle(ref, () => ({ save: saveRow }))
 
-    const error = validationError ?? (createRow.isError ? getErrorMessage(createRow.error) : null)
+        const error =
+            validationError ?? (createRow.isError ? getErrorMessage(createRow.error) : null)
 
-    return (
-        <>
-            <tr className="bg-primary/5 align-top">
-                {columns.map((columnName) => {
-                    const metadata = metadataByColumn.get(columnName)
+        return (
+            <>
+                <tr className="bg-primary/5 align-top">
+                    {columns.map((columnName) => {
+                        const metadata = metadataByColumn.get(columnName)
 
-                    return (
-                        <td
-                            key={columnName}
-                            className="w-64 max-w-64 px-2 py-1.5 first:border-l-0 border-l "
-                        >
-                            {metadataQuery.isPending && (
-                                <span className="text-xs text-muted-foreground">Loading…</span>
-                            )}
-                            {metadataQuery.isError && (
-                                <span className="text-xs text-destructive">Unavailable</span>
-                            )}
-                            {metadata && (
-                                <InlineColumnControl
-                                    column={metadata}
-                                    value={values[columnName] ?? ''}
-                                    onChange={(value) => changeValue(columnName, value)}
-                                />
-                            )}
-                        </td>
-                    )
-                })}
-            </tr>
-            {error && (
-                <tr className="bg-destructive/5">
-                    <td colSpan={columns.length} className="px-2 py-1 text-xs text-destructive">
-                        {error}
-                    </td>
+                        return (
+                            <td
+                                key={columnName}
+                                className="w-64 max-w-64 px-2 py-1.5 first:border-l-0 border-l "
+                            >
+                                {metadataQuery.isPending && (
+                                    <span className="text-xs text-muted-foreground">Loading…</span>
+                                )}
+                                {metadataQuery.isError && (
+                                    <span className="text-xs text-destructive">Unavailable</span>
+                                )}
+                                {metadata && (
+                                    <InlineColumnControl
+                                        column={metadata}
+                                        value={values[columnName] ?? ''}
+                                        onChange={(value) => changeValue(columnName, value)}
+                                    />
+                                )}
+                            </td>
+                        )
+                    })}
                 </tr>
-            )}
-        </>
-    )
-})
+                {error && (
+                    <tr className="bg-destructive/5">
+                        <td colSpan={columns.length} className="px-2 py-1 text-xs text-destructive">
+                            {error}
+                        </td>
+                    </tr>
+                )}
+            </>
+        )
+    },
+)
 
 export function InlineColumnControl({
     column,
@@ -151,26 +162,38 @@ export function InlineColumnControl({
     const enumValues = Array.isArray(column.enum_values) ? column.enum_values : []
     if (enumValues.length > 0 || column.data_type === 'boolean') {
         const options = enumValues.length > 0 ? enumValues : ['true', 'false']
+        const items = [
+            { value: '', label: column.column_default ? 'Use default' : 'Select…' },
+            ...(column.is_nullable ? [{ value: NULL_VALUE, label: 'NULL' }] : []),
+            ...options.map((option) => ({ value: option, label: option })),
+        ]
         return (
-            <select
-                aria-label={label ?? column.column_name}
+            <Select
+                items={items}
                 value={value}
                 disabled={disabled}
-                onChange={(event) => onChange(event.target.value)}
-                className={
-                    fullCell
-                        ? cellClassName
-                        : 'h-7 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30'
-                }
+                onValueChange={(next) => {
+                    if (next !== null) onChange(next)
+                }}
             >
-                <option value="">{column.column_default ? 'Use default' : 'Select…'}</option>
-                {column.is_nullable && <option value={NULL_VALUE}>NULL</option>}
-                {options.map((option) => (
-                    <option key={option} value={option}>
-                        {option}
-                    </option>
-                ))}
-            </select>
+                <SelectTrigger
+                    aria-label={label ?? column.column_name}
+                    className={
+                        fullCell
+                            ? 'h-full w-full min-w-0 rounded-none border-0 bg-transparent px-3 py-2 text-sm shadow-none focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 data-[size=default]:h-full dark:bg-transparent'
+                            : 'w-full'
+                    }
+                >
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="start" alignItemWithTrigger={false}>
+                    {items.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         )
     }
 

@@ -74,3 +74,25 @@ test('renders a floating Save changes bar and disables actions while saving', ()
     assert.match(html, /Saving…/)
     assert.equal((html.match(/\sdisabled=""/g) ?? []).length, 2)
 })
+
+test('uses Base UI combobox triggers for enum and boolean cells with the selected labels', () => {
+    const status = { ...name, column_name: 'status', enum_values: ['open', 'closed'] }
+    const active = { ...name, column_name: 'active', data_type: 'boolean', udt_name: 'bool' }
+    const html = renderToStaticMarkup(
+        createElement(EditableDataTable, {
+            columns: [
+                { name: 'status', metadata: status },
+                { name: 'active', metadata: active },
+            ],
+            rows: [{ id: 1, status: 'closed', active: false }],
+            drafts: new Map(),
+            keyColumns: [id],
+            disabled: false,
+            onChange: () => {},
+        }),
+    )
+    assert.equal((html.match(/role="combobox"/g) ?? []).length, 2)
+    assert.match(html, />closed</)
+    assert.match(html, />false</)
+    assert.match(html, /data-\[size=default\]:h-full/)
+})
