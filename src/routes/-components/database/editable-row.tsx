@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select'
-import { createTableRow, loadTableMetadata } from '#/internal/functions'
+import { createTableRow, GetTableMetadata } from '#/internal/functions'
 
 import type { DatabaseColumnMetadata, InsertValue } from '#/internal'
 
@@ -34,7 +34,7 @@ export const EditableRow = forwardRef<EditableRowHandle, EditableRowProps>(
         const [values, setValues] = useState<Record<string, string>>({})
         const [validationError, setValidationError] = useState<string | null>(null)
         const queryClient = useQueryClient()
-        const getMetadata = useServerFn(loadTableMetadata)
+        const getMetadata = useServerFn(GetTableMetadata)
         const addRow = useServerFn(createTableRow)
 
         const metadataQuery = useQuery({

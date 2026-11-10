@@ -15,7 +15,7 @@ import {
 } from '#/components/ui/select'
 import {
     loadTableData,
-    loadTableMetadata,
+    GetTableMetadata,
     createTableRow,
     updateTableRow,
 } from '#/internal/functions'
@@ -108,7 +108,7 @@ export function TableContents({
     const [drafts, setDrafts] = useState<Map<string, RowDraft>>(() => new Map())
     const [editError, setEditError] = useState<string | null>(null)
 
-    const getMetadata = useServerFn(loadTableMetadata)
+    const getMetadata = useServerFn(GetTableMetadata)
     const metadataQuery = useQuery({
         queryKey: ['table-metadata-v4', selectedSchema, tableName],
         queryFn: () => getMetadata({ data: { schema: selectedSchema!, table: tableName } }),

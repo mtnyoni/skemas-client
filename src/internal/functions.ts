@@ -70,7 +70,7 @@ const tableTargetSchema = z.object({
     table: z.string().min(1),
 })
 
-export const loadTableMetadata = createServerFn({ method: 'GET' })
+export const GetTableMetadata = createServerFn({ method: 'GET' })
     .validator(tableTargetSchema)
     .handler(async ({ data }) => {
         const { getTableMetadata } = await import('./index')
