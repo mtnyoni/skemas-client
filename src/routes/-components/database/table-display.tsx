@@ -23,8 +23,9 @@ import {
 import { InlineColumnControl, NULL_VALUE } from './editable-row'
 import { EditRowCell } from './edit-row-cell'
 import { Checkbox } from '#/components/ui/checkbox'
-import type { DatabaseColumnMetadata, QueryValue, InsertValue } from '#/internal'
-import type postgres from 'postgres'
+import type { DatabaseColumnMetadata, InsertValue } from '#/internal'
+import type { TableRow, TableValue } from '#/db/table-row'
+import { formatTableValue } from './table-value'
 import { InputGroup, InputGroupAddon } from '#/components/ui/input-group'
 import { Popover, PopoverContent, PopoverTrigger } from '#/components/ui/popover'
 import { createColumnHelper } from '@tanstack/react-table'
@@ -80,14 +81,7 @@ export function TableDisplay() {
     return <TableContents tableName={selectedTable} contents={tableContents} />
 }
 
-type TableContents = {
-    columns: {
-        name: string
-    }[]
-    rows: Record<string, QueryValue>[] &
-        Iterable<Record<string, QueryValue>> &
-        postgres.ResultQueryMeta<number, string>
-}
+type TableContents = Awaited<ReturnType<typeof loadTableData>>
 
 export function TableContents({
     tableName,
@@ -103,7 +97,7 @@ export function TableContents({
     const [addingRow, setAddingRow] = useState(false)
     const [newRowValues, setNewRowValues] = useState<Record<string, string>>({})
     const [validationError, setValidationError] = useState<string | null>(null)
-    const [editingRow, setEditingRow] = useState<Record<string, QueryValue> | null>(null)
+    const [editingRow, setEditingRow] = useState<TableRow | null>(null)
     const [editValues, setEditValues] = useState<Record<string, string>>({})
     const [editError, setEditError] = useState<string | null>(null)
 
@@ -157,7 +151,7 @@ export function TableContents({
         },
     })
 
-    function startEditingRow(row: Record<string, QueryValue>) {
+    function startEditingRow(row: TableRow) {
         saveRow.reset()
         setEditingRow(row)
         setEditValues({})
@@ -256,8 +250,8 @@ export function TableContents({
         addingRow,
     })
 
-    const tableData = useMemo(
-        () => (addingRow ? [newRowSentinel, ...contents.rows] : contents.rows),
+    const tableData = useMemo<TableRow[]>(
+        () => (addingRow ? [newRowSentinel, ...contents.rows] : [...contents.rows]),
         [addingRow, newRowSentinel, contents.rows],
     )
 
@@ -367,17 +361,17 @@ export function TableContents({
 
 type TableColumnsOptions = {
     contents: TableContents
-    newRowSentinel: Record<string, QueryValue>
+    newRowSentinel: TableRow
     newRowValues: Record<string, string>
     setNewRowValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
     metadataByColumn: Map<string, DatabaseColumnMetadata>
     metadataPending: boolean
     metadataError: boolean
-    editingRow: Record<string, QueryValue> | null
+    editingRow: TableRow | null
     editValues: Record<string, string>
     setEditValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
     canEdit: boolean
-    startEditingRow: (row: Record<string, QueryValue>) => void
+    startEditingRow: (row: TableRow) => void
     cancelEditingRow: () => void
     saveEditedRow: () => void
     editPending: boolean
@@ -403,7 +397,7 @@ function useTableColumns({
     addingRow,
 }: TableColumnsOptions) {
     return useMemo(() => {
-        const columnHelper = createColumnHelper<DataTableFeatures, Record<string, QueryValue>>()
+        const columnHelper = createColumnHelper<DataTableFeatures, TableRow>()
         const columns = contents.columns.map((column, colIdx) =>
             columnHelper.accessor((row) => row[column.name], {
                 id: column.name,
@@ -470,19 +464,17 @@ function useTableColumns({
                         return <span className="text-gray-400 italic">null</span>
                     }
 
-                    if (value instanceof Date) {
-                        return value.toLocaleString()
-                    }
+                    if (value instanceof Date) return formatTableValue(value)
 
                     if (typeof value === 'object') {
                         return (
                             <code className="text-xs text-muted-foreground truncate block">
-                                {JSON.stringify(value)}
+                                {formatTableValue(value)}
                             </code>
                         )
                     }
 
-                    return String(value)
+                    return formatTableValue(value)
                 },
             }),
         )
@@ -523,7 +515,7 @@ function useTableColumns({
                     )
                 },
             }),
-        ] as ColumnDef<DataTableFeatures, Record<string, QueryValue>, QueryValue>[]
+        ] as ColumnDef<DataTableFeatures, TableRow, TableValue>[]
     }, [
         contents.columns,
         newRowSentinel,

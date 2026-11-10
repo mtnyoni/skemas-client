@@ -31,15 +31,24 @@ export const loadTableData = createServerFn({ method: 'GET' })
         }),
     )
     .handler(async ({ data }) => {
-        const { getTableData } = await import('./index')
+        const { getTableData } = await import('#/db/table')
 
-        return runDatabaseOperation('load table data', () =>
+        const result = await runDatabaseOperation('load table data', () =>
             getTableData(data.schema, data.table, {
                 limit: data.limit,
                 sort: data.sort,
                 order: data.order,
             }),
         )
+        return {
+            ...result,
+            warnings: result.warnings.map(({ schema, table, column, error }) => ({
+                schema,
+                table,
+                column,
+                error: { _tag: error._tag, message: error.message },
+            })),
+        }
     })
 
 export const loadDBRelationships = createServerFn({ method: 'GET' })
